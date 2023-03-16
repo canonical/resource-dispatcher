@@ -1,0 +1,89 @@
+# reusable workflow triggered by other actions
+name: CI
+
+on:
+  workflow_call:
+    secrets:
+      charmcraft-credentials:
+        required: true
+
+jobs:
+
+  lib-check:
+    name: Check libraries
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: Check libs
+        uses: canonical/charming-actions/check-libraries@2.1.1
+        with:
+          credentials: "${{ secrets.charmcraft-credentials }}"
+          github-token: "${{ secrets.GITHUB_TOKEN }}"
+
+  lint:
+    name: Lint Check
+    runs-on: ubuntu-20.04
+
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v2
+
+    - name: Install dependencies
+      run: sudo apt-get install python3-pip tox
+
+    - name: Lint code
+      run: tox -e lint
+
+  unit:
+    name: Unit Test
+    runs-on: ubuntu-20.04
+
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v2
+
+    - name: Install dependencies
+      run: sudo apt-get install python3-pip tox
+
+    - name: Run unit tests
+      run: tox -e unit
+
+  integration:
+    name: Integration Test (build and deploy)
+    runs-on: ubuntu-20.04
+
+    steps:
+    - name: Check out repo
+      uses: actions/checkout@v2
+
+    - name: Setup operator environment
+      uses: charmed-kubernetes/actions-operator@main
+      with:
+        provider: microk8s
+        channel: 1.24/stable
+        # Pinned until this bug is resolved: https://bugs.launchpad.net/juju/+bug/1992833
+        bootstrap-options: "--agent-version=2.9.34"
+        microk8s-addons: "dns storage rbac metallb:10.64.140.43-10.64.140.49"
+
+    - name: Run integration tests
+      run: tox -vve integration -- --model testing
+
+    # On failure, capture debugging resources
+    - name: Get all
+      run: kubectl get all -A
+      if: failure()
+
+    - name: Get juju status
+      run: juju status
+      if: failure()
+
+    - name: Get workload logs
+      run: kubectl logs --tail 100 -ntesting -lapp.kubernetes.io/name=resource-dispatcher
+      if: failure()
+
+    - name: Get operator logs
+      run: kubectl logs --tail 100 -ntesting -loperator.juju.is/name=resource-dispatcher
+      if: failure()

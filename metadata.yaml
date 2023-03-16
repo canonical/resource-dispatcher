@@ -1,0 +1,18 @@
+#!/usr/bin/env python3
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
+#
+
+name: resource-dispatcher
+description: |
+  Resource
+summary: |
+  Charm responsible for injecting kubernetes object to newly created namespaces.
+containers:
+  resource-dispatcher:
+    resource: oci-image
+resources:
+  oci-image:
+    type: oci-image
+    description: Backing OCI image
+    upstream-source: charmedkubeflow/resource-dispatcher:1.0-22.04

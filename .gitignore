@@ -1,0 +1,13 @@
+venv/
+build/
+*.charm
+.tox/
+.coverage
+__pycache__/
+*.py[cod]
+.idea
+.vscode/
+
+kubeconfig.tmp
+new_config
+.mypy_cache

@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    user.kubeflow.org/enabled: "true"
+    # pipelines.kubeflow.org/enabled: "true"
+  name: misko-test
+

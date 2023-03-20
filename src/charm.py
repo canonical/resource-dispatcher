@@ -74,7 +74,7 @@ class ResourceDispatcherOperator(CharmBase):
                     "summary": "Entrypoint of resource-dispatcher-operator image",
                     "command": (
                         "python3 "
-                        "server.py "
+                        "main.py "
                         f"--port {self._port} "
                         f"--label {self._namespace_label}"
                     ),

@@ -81,8 +81,7 @@ async def test_build_and_deploy_charms(ops_test: OpsTest):
         status="active",
         raise_on_blocked=False,
         raise_on_error=False,
-        timeout=600,
-        idle_period=600,
+        timeout=600
     )
 
 

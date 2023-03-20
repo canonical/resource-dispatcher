@@ -19,7 +19,7 @@ EXPECTED_SERVICE = {
             "summary": "Entrypoint of resource-dispatcher-operator image",
             "startup": "enabled",
             "override": "replace",
-            "command": "python3 server.py --port 80 --label user.kubeflow.org/enabled",
+            "command": "python3 main.py --port 80 --label user.kubeflow.org/enabled",
         },
     )
 }

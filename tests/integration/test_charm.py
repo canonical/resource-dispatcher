@@ -8,6 +8,7 @@ from pathlib import Path
 import lightkube
 import pytest
 import yaml
+import time
 from lightkube import codecs
 from lightkube.generic_resource import create_global_resource
 from lightkube.resources.core_v1 import Namespace, Pod, Secret, ServiceAccount
@@ -87,5 +88,6 @@ async def test_build_and_deploy_charms(ops_test: OpsTest):
 
 @pytest.mark.abort_on_fail
 async def test_minio_secret_added(lightkube_client: lightkube.Client, namespace: str) -> None:
+    time.sleep(30)  # sit can take up to 10 seconds for reconciliation loop to trigger (+ time to create namespace)
     secret = lightkube_client.get(Secret, SECRET_NAME, namespace=namespace)
     assert secret != None

@@ -96,27 +96,6 @@ class TestCharm:
         "charm.KubernetesServicePatch",
         lambda x, y, service_name, service_type, refresh_event: None,
     )
-    def tests_on_pebble_ready_failure(self):
-        harness = Harness(ResourceDispatcherOperator)
-        harness.set_can_connect("resource-dispatcher", False)
-        harness.begin()
-        with pytest.raises(ErrorWithStatus):
-            harness.charm._on_pebble_ready(None)
-
-    @patch(
-        "charm.KubernetesServicePatch",
-        lambda x, y, service_name, service_type, refresh_event: None,
-    )
-    def tests_on_pebble_ready_success(self, harness: Harness):
-        harness.begin()
-        harness.charm._on_event = MagicMock()
-        harness.charm._on_pebble_ready(None)
-        harness.charm._on_event.assert_called()
-
-    @patch(
-        "charm.KubernetesServicePatch",
-        lambda x, y, service_name, service_type, refresh_event: None,
-    )
     @patch("charm.ResourceDispatcherOperator.container")
     def test_update_layer_failure_container_problem(
         self,
@@ -127,8 +106,10 @@ class TestCharm:
         change.tasks = []
         container.replan.side_effect = _FakeChangeError("Fake problem during layer update", change)
         harness.begin()
-        with pytest.raises(ErrorWithStatus):
+        with pytest.raises(ErrorWithStatus) as exc_info:
             harness.charm._update_layer()
+
+        assert "Fake problem during layer update" in str(exc_info)
 
     @patch(
         "charm.KubernetesServicePatch",
@@ -150,8 +131,10 @@ class TestCharm:
     def test_deploy_k8s_resources_failure(self, k8s_handler: MagicMock, harness: Harness):
         k8s_handler.apply.side_effect = _FakeApiError()
         harness.begin()
-        with pytest.raises(ErrorWithStatus):
+        with pytest.raises(ErrorWithStatus) as exc_info:
             harness.charm._deploy_k8s_resources()
+
+        assert "K8S resources creation failed" in str(exc_info)
 
     @patch(
         "charm.KubernetesServicePatch",
@@ -162,7 +145,9 @@ class TestCharm:
         harness.begin()
         harness.charm._deploy_k8s_resources()
         k8s_handler.apply.assert_called()
-        assert harness.charm.model.unit.status == MaintenanceStatus("K8S resources created")
+        assert harness.charm.model.unit.status == WaitingStatus(
+            "K8s resources created. Waiting for charm to be active"
+        )
 
     @patch(
         "charm.KubernetesServicePatch",

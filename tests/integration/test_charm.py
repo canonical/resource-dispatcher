@@ -3,17 +3,14 @@
 
 import logging
 import time
-from base64 import b64decode
 from pathlib import Path
 
 import lightkube
 import pytest
 import yaml
 from lightkube import codecs
-from lightkube.generic_resource import create_global_resource
-from lightkube.resources.core_v1 import Namespace, Pod, Secret, ServiceAccount
+from lightkube.resources.core_v1 import Secret
 from pytest_operator.plugin import OpsTest
-from tenacity import retry, stop_after_delay, wait_exponential
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +29,23 @@ def _safe_load_file_to_text(filename: str) -> str:
     except FileNotFoundError:
         text = filename
     return text
+
+
+def delete_all_from_yaml(yaml_text: str, lightkube_client: lightkube.Client = None):
+    """Deletes all k8s resources listed in a YAML file via lightkube.
+
+    Args:
+        yaml_file (str or Path): Either a string filename or a string of valid YAML.  Will attempt
+                                 to open a filename at this path, failing back to interpreting the
+                                 string directly as YAML.
+        lightkube_client: Instantiated lightkube client or None
+    """
+
+    if lightkube_client is None:
+        lightkube_client = lightkube.Client()
+
+    for obj in codecs.load_all_yaml(yaml_text):
+        lightkube_client.delete(type(obj), obj.metadata.name)
 
 
 @pytest.fixture(scope="session")
@@ -53,6 +67,8 @@ def namespace(lightkube_client: lightkube.Client):
         raise e
 
     yield obj.metadata.name
+
+    delete_all_from_yaml(yaml_text, lightkube_client)
 
 
 @pytest.mark.abort_on_fail

@@ -35,14 +35,13 @@ class ResourceDispatcherOperator(CharmBase):
         self._container_name = "resource-dispatcher"
         self._container = self.unit.get_container(self._container_name)
 
-        self._context = {"app_name": self._name, "namespace": self._namespace}
+        self._context = {"app_name": self._name, "namespace": self._namespace, "port": self._port}
 
         self._k8s_resource_handler = None
 
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(self.on.upgrade_charm, self._on_event)
         self.framework.observe(self.on.config_changed, self._on_event)
-        self.framework.observe(self.on.resource_dispatcher_pebble_ready, self._on_pebble_ready)
         self.framework.observe(self.on.remove, self._on_remove)
 
         # for rel in self.model.relations.keys():
@@ -108,15 +107,6 @@ class ResourceDispatcherOperator(CharmBase):
             self.logger.info("Not a leader, skipping setup")
             raise ErrorWithStatus("Waiting for leadership", WaitingStatus)
 
-    def _on_pebble_ready(self, _):
-        """Configure started container."""
-        if not self.container.can_connect():
-            # Pebble Ready event should indicate that container is available
-            raise ErrorWithStatus("Pebble is ready and container is not ready", BlockedStatus)
-
-        # proceed with other actions
-        self._on_event(_)
-
     def _deploy_k8s_resources(self) -> None:
         """Deploys K8S resources."""
         try:
@@ -124,7 +114,9 @@ class ResourceDispatcherOperator(CharmBase):
             self.k8s_resource_handler.apply()
         except ApiError:
             raise ErrorWithStatus("K8S resources creation failed", BlockedStatus)
-        self.model.unit.status = MaintenanceStatus("K8S resources created")
+        self.model.unit.status = WaitingStatus(
+            "K8s resources created. Waiting for charm to be active"
+        )
 
     def _on_install(self, _):
         """Installation only tasks."""
@@ -164,8 +156,9 @@ class ResourceDispatcherOperator(CharmBase):
         try:
             delete_many(self.k8s_resource_handler.lightkube_client, k8s_resources_manifests)
         except ApiError as err:
-            self.logger.error(f"Failed to delete K8S resources, with error: {err}")
-            raise err
+            if err.status.code != 404:
+                self.logger.error(f"Failed to delete K8S resources, with error: {err}")
+                raise err
         self.unit.status = MaintenanceStatus("K8S resources removed")
 
 

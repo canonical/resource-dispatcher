@@ -3,11 +3,6 @@
 #
 
 options:
-  resource_dispatcher_port:
-    description: |
-      The port ResourceDispatcher will be listening on
-    default: 80
-    type: int
   target_namespace_label:
     description: |
       Kubernetes namespace label where the resources should be deployed

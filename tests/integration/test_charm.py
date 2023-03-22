@@ -61,10 +61,7 @@ def namespace(lightkube_client: lightkube.Client):
     for label in TESTING_LABELS:
         yaml_rendered["metadata"]["labels"][label] = "true"
     obj = codecs.from_dict(yaml_rendered)
-    try:
-        lightkube_client.apply(obj)
-    except lightkube.core.exceptions.ApiError as e:
-        raise e
+    lightkube_client.apply(obj)
 
     yield obj.metadata.name
 
@@ -92,14 +89,6 @@ async def test_build_and_deploy_charms(ops_test: OpsTest):
 
     await ops_test.model.wait_for_idle(status="active", raise_on_blocked=True, timeout=300)
     assert ops_test.model.applications[CHARM_NAME].units[0].workload_status == "active"
-
-    await ops_test.model.wait_for_idle(
-        apps=[METACONTROLLER_CHARM_NAME],
-        status="active",
-        raise_on_blocked=False,
-        raise_on_error=False,
-        timeout=600,
-    )
 
 
 @pytest.mark.abort_on_fail

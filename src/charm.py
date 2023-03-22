@@ -5,7 +5,7 @@
 
 import logging
 
-from charmed_kubeflow_chisme.exceptions import ErrorWithStatus
+from charmed_kubeflow_chisme.exceptions import ErrorWithStatus, GenericCharmRuntimeError
 from charmed_kubeflow_chisme.kubernetes import KubernetesResourceHandler
 from charmed_kubeflow_chisme.lightkube.batch import delete_many
 from charms.observability_libs.v1.kubernetes_service_patch import KubernetesServicePatch
@@ -14,7 +14,7 @@ from lightkube.generic_resource import load_in_cluster_generic_resources
 from lightkube.models.core_v1 import ServicePort
 from ops.charm import CharmBase
 from ops.main import main
-from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus
+from ops.model import ActiveStatus, MaintenanceStatus, WaitingStatus
 from ops.pebble import ChangeError, Layer
 
 K8S_RESOURCE_FILES = ["src/templates/composite-controller.yaml.j2"]
@@ -30,7 +30,7 @@ class ResourceDispatcherOperator(CharmBase):
         self._namespace = self.model.name
         self._lightkube_field_manager = "lightkube"
         self._name = self.model.app.name
-        self._port = self.model.config["resource_dispatcher_port"]
+        self._port = 80
         self._namespace_label = self.model.config["target_namespace_label"]
         self._container_name = "resource-dispatcher"
         self._container = self.unit.get_container(self._container_name)
@@ -112,8 +112,8 @@ class ResourceDispatcherOperator(CharmBase):
         try:
             self.unit.status = MaintenanceStatus("Creating K8S resources")
             self.k8s_resource_handler.apply()
-        except ApiError:
-            raise ErrorWithStatus("K8S resources creation failed", BlockedStatus)
+        except ApiError as err:
+            raise GenericCharmRuntimeError("K8S resources creation failed") from err
         self.model.unit.status = WaitingStatus(
             "K8s resources created. Waiting for charm to be active"
         )
@@ -134,7 +134,7 @@ class ResourceDispatcherOperator(CharmBase):
                 self.logger.info("Pebble plan updated with new configuration, replaning")
                 self.container.replan()
             except ChangeError as err:
-                raise ErrorWithStatus(f"Failed to replan with error: {str(err)}", BlockedStatus)
+                raise GenericCharmRuntimeError(f"Failed to replan with error: {str(err)}") from err
 
     def _on_event(self, event) -> None:
         """Perform all required actions for the Charm."""

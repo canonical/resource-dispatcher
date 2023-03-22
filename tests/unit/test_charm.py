@@ -4,7 +4,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
-from charmed_kubeflow_chisme.exceptions import ErrorWithStatus
+from charmed_kubeflow_chisme.exceptions import ErrorWithStatus, GenericCharmRuntimeError
 from lightkube import ApiError
 from ops.model import MaintenanceStatus, WaitingStatus
 from ops.pebble import ChangeError, Service
@@ -106,7 +106,7 @@ class TestCharm:
         change.tasks = []
         container.replan.side_effect = _FakeChangeError("Fake problem during layer update", change)
         harness.begin()
-        with pytest.raises(ErrorWithStatus) as exc_info:
+        with pytest.raises(GenericCharmRuntimeError) as exc_info:
             harness.charm._update_layer()
 
         assert "Fake problem during layer update" in str(exc_info)
@@ -131,7 +131,7 @@ class TestCharm:
     def test_deploy_k8s_resources_failure(self, k8s_handler: MagicMock, harness: Harness):
         k8s_handler.apply.side_effect = _FakeApiError()
         harness.begin()
-        with pytest.raises(ErrorWithStatus) as exc_info:
+        with pytest.raises(GenericCharmRuntimeError) as exc_info:
             harness.charm._deploy_k8s_resources()
 
         assert "K8S resources creation failed" in str(exc_info)

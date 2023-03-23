@@ -1,6 +1,7 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 
+import base64
 import logging
 import time
 from pathlib import Path
@@ -16,6 +17,13 @@ logger = logging.getLogger(__name__)
 
 CHARM_NAME = "resource-dispatcher"
 METACONTROLLER_CHARM_NAME = "metacontroller-operator"
+MLFLOW_CHARM_NAME = "mlflow"
+OBJECT_STORAGE_CHARM_NAME = "minio"
+OBJECT_STORAGE_CONFIG = {
+    "access-key": "minio",
+    "secret-key": "minio123",
+    "port": "9000",
+}
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 NAMESPACE_FILE = "./tests/integration/namespace.yaml"
 TESTING_LABELS = ["user.kubeflow.org/enabled"]  # Might be more than one in the future
@@ -70,15 +78,26 @@ def namespace(lightkube_client: lightkube.Client):
 
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy_charms(ops_test: OpsTest):
-    built_charm_path = await ops_test.build_charm("./")
-    image_path = METADATA["resources"]["oci-image"]["upstream-source"]
-    resources = {"oci-image": image_path}
+    await ops_test.model.deploy(
+        "local:../mlflow-operator/mlflow-server_ubuntu-20.04-amd64.charm",
+        resources={"oci-image": "docker.io/charmedkubeflow/mlflow:latest"},
+        application_name=MLFLOW_CHARM_NAME,
+        trust=True,
+    )
+
+    await ops_test.model.deploy(OBJECT_STORAGE_CHARM_NAME, config=OBJECT_STORAGE_CONFIG)
 
     await ops_test.model.deploy(
         entity_url=METACONTROLLER_CHARM_NAME,
         channel="latest/edge",
         trust=True,
     )
+
+    await ops_test.model.relate(OBJECT_STORAGE_CHARM_NAME, MLFLOW_CHARM_NAME)
+
+    built_charm_path = await ops_test.build_charm("./")
+    image_path = METADATA["resources"]["oci-image"]["upstream-source"]
+    resources = {"oci-image": image_path}
 
     await ops_test.model.deploy(
         entity_url=built_charm_path,
@@ -87,7 +106,15 @@ async def test_build_and_deploy_charms(ops_test: OpsTest):
         trust=True,
     )
 
-    await ops_test.model.wait_for_idle(status="active", raise_on_blocked=True, timeout=300)
+    await ops_test.model.relate(CHARM_NAME, MLFLOW_CHARM_NAME)
+
+    await ops_test.model.wait_for_idle(
+        apps=[OBJECT_STORAGE_CHARM_NAME, CHARM_NAME, METACONTROLLER_CHARM_NAME],
+        status="active",
+        raise_on_blocked=False,
+        raise_on_error=False,
+        timeout=300,
+    )
     assert ops_test.model.applications[CHARM_NAME].units[0].workload_status == "active"
 
 
@@ -95,6 +122,13 @@ async def test_build_and_deploy_charms(ops_test: OpsTest):
 async def test_minio_secret_added(lightkube_client: lightkube.Client, namespace: str) -> None:
     time.sleep(
         30
-    )  # sit can take up to 10 seconds for reconciliation loop to trigger (+ time to create namespace)
+    )  # sync can take up to 10 seconds for reconciliation loop to trigger (+ time to create namespace)
     secret = lightkube_client.get(Secret, SECRET_NAME, namespace=namespace)
-    assert secret != None
+    assert secret.data == {
+        "AWS_ACCESS_KEY_ID": base64.b64encode(
+            OBJECT_STORAGE_CONFIG["access-key"].encode("utf-8")
+        ).decode("utf-8"),
+        "AWS_SECRET_ACCESS_KEY": base64.b64encode(
+            OBJECT_STORAGE_CONFIG["secret-key"].encode("utf-8")
+        ).decode("utf-8"),
+    }

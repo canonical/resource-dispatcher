@@ -1,0 +1,19 @@
+apiVersion: metacontroller.k8s.io/v1alpha1
+kind: CompositeController
+metadata:
+  name: kubeflow-resource-dispatcher-controller
+spec:
+  generateSelector: true
+  resyncPeriodSeconds: 10
+  parentResource:
+    apiVersion: v1
+    resource: namespaces
+  childResources:
+    - apiVersion: v1
+      resource: secrets
+      updateStrategy:
+        method: OnDelete
+  hooks:
+    sync:
+      webhook:
+        url: "http://{{ app_name }}.{{ namespace }}:{{ port }}/sync"

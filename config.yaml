@@ -1,0 +1,11 @@
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
+#
+
+options:
+  target_namespace_label:
+    description: |
+      Kubernetes namespace label where the resources should be deployed
+    default: 'user.kubeflow.org/enabled'
+    type: string
+

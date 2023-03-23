@@ -1,0 +1,5 @@
+charmed-kubeflow-chisme==0.0.8
+lightkube-models
+ops
+oci-image
+serialized-data-interface

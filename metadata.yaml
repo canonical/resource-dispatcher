@@ -16,8 +16,8 @@ resources:
     description: Backing OCI image
     upstream-source: charmedkubeflow/resource-dispatcher:1.0_beta-22.04
 requires:
-  secret:
-    interface: secret
+  secrets:
+    interface: secrets
     schema:
       v1:
         provides:

@@ -141,12 +141,12 @@ class ResourceDispatcherOperator(CharmBase):
     def _get_secrets(self, interfaces):
         """Unpacks and returns the secret relation data."""
 
-        if not ((secrets := interfaces["secret"]) and secrets.get_data()):
+        if not ((secrets := interfaces["secrets"]) and secrets.get_data()):
             logging.info("No secret data presented in relation")
             return None
 
         try:
-            secret = list(secrets.get_data().values())[0]
+            secrets = list(secrets.get_data().values())[0]
         except Exception as e:
             raise ErrorWithStatus(
                 f"Unexpected error unpacking secret data - data format not "
@@ -154,7 +154,7 @@ class ResourceDispatcherOperator(CharmBase):
                 BlockedStatus,
             )
 
-        secrets = json.loads(secret["secrets"])
+        secrets = json.loads(secrets["secrets"])
         return secrets
 
     def _push_manifests(self, manifests, push_location):

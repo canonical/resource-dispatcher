@@ -6,8 +6,8 @@ summary: |
 description: |
   Charm for sending manifests to ResourceDispatcher relations.
 provides:
-  secret:
-    interface: secret
+  secrets:
+    interface: secrets
     schema:
       v1:
         provides:

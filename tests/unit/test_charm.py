@@ -94,7 +94,7 @@ def add_secret_relation_to_harness(harness: Harness) -> Harness:
         "_supported_versions": "- v1",
         "data": yaml.dump(SECRET_RELATION_DATA),
     }
-    secret_relation_id = harness.add_relation("secret", "mlflow-server")
+    secret_relation_id = harness.add_relation("secrets", "mlflow-server")
     harness.add_relation_unit(secret_relation_id, "mlflow-server/0")
     harness.update_relation_data(secret_relation_id, "mlflow-server", secret_relation_data)
     return harness
@@ -246,7 +246,7 @@ class TestCharm:
         harness = add_secret_relation_to_harness(harness)
         harness.begin()
         interfaces = harness.charm._get_interfaces()
-        assert interfaces["secret"] != None
+        assert interfaces["secrets"] != None
 
     @patch(
         "charm.KubernetesServicePatch",
@@ -264,7 +264,7 @@ class TestCharm:
         lambda x, y, service_name, service_type, refresh_event: None,
     )
     def test_get_secrets_no_secret_dat_success(self, harness: Harness):
-        interfaces = {"secret": {}}
+        interfaces = {"secrets": {}}
         harness.begin()
         secrets = harness.charm._get_secrets(interfaces)
 
@@ -277,7 +277,7 @@ class TestCharm:
     def test_get_secrets_no_secret_failure(self, harness: Harness):
         secret_object = MagicMock()
         secret_object.get_data = MagicMock()
-        interfaces = {"secret": secret_object}
+        interfaces = {"secrets": secret_object}
         harness.begin()
 
         with pytest.raises(ErrorWithStatus) as e_info:

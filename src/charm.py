@@ -50,6 +50,7 @@ class ResourceDispatcherOperator(CharmBase):
 
         for rel in self.model.relations.keys():
             self.framework.observe(self.on[rel].relation_changed, self._on_event)
+            self.framework.observe(self.on[rel].relation_broken, self._on_event)
 
         port = ServicePort(int(self._port), name=f"{self.app.name}")
         self.service_patcher = KubernetesServicePatch(
@@ -184,7 +185,7 @@ class ResourceDispatcherOperator(CharmBase):
                     return False
         return True
 
-    def _push_manifests(self, manifests, push_location):
+    def _sync_manifests(self, manifests, push_location):
         """Push list of manifests into layer.
 
         Args:
@@ -192,9 +193,25 @@ class ResourceDispatcherOperator(CharmBase):
             push_location: Container location where the manifests should be pushed to.
             relation: name of relation being handled.
         """
-        for manifest in manifests:
-            filename = manifest["metadata"]["name"]
-            self.container.push(f"{push_location}/{filename}.yaml", yaml.dump(manifest))
+        all_files = self.container.list_files(push_location)
+        if manifests:
+            manifests_locations = [
+                f"{push_location}/{m['metadata']['name']}.yaml" for m in manifests
+            ]
+        else:
+            manifests_locations = []
+        self.logger.info(f"all_files {all_files}")
+        self.logger.info(f"manifests_names {manifests_locations}")
+        if all_files:
+            for file in all_files:
+                self.logger.info(f"Checking file {file.path}")
+                if file.path not in manifests_locations:
+                    self.logger.info(f"Removing file {file.path}")
+                    self.container.remove_path(file.path)
+        if manifests:
+            for manifest in manifests:
+                filename = manifest["metadata"]["name"]
+                self.container.push(f"{push_location}/{filename}.yaml", yaml.dump(manifest))
         logging.info(self.container.list_files(push_location))
 
     def _update_manifests(self, interfaces, dispatch_folder, relation):
@@ -206,8 +223,7 @@ class ResourceDispatcherOperator(CharmBase):
                 BlockedStatus,
             )
         logging.info(f"received {relation} are {manifests}")
-        if manifests is not None:
-            self._push_manifests(manifests, dispatch_folder)
+        self._sync_manifests(manifests, dispatch_folder)
 
     def _on_event(self, event) -> None:
         """Perform all required actions for the Charm."""

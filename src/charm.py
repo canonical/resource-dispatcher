@@ -203,7 +203,7 @@ class ResourceDispatcherOperator(CharmBase):
         if not self._manifests_valid(manifests):
             raise ErrorWithStatus(
                 f"Manifests names in all relations must be valid, received manifests {manifests}",
-                WaitingStatus,
+                BlockedStatus,
             )
         logging.info(f"received {relation} are {manifests}")
         if manifests is not None:

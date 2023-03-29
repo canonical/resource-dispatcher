@@ -351,4 +351,4 @@ class TestCharm:
         with pytest.raises(ErrorWithStatus) as e_info:
             harness.charm._update_manifests(None, "", "secrets")
         assert "Manifests names in all relations must be valid, received manifests " in str(e_info)
-        assert e_info.value.status_type(WaitingStatus)
+        assert e_info.value.status_type(BlockedStatus)

@@ -101,7 +101,6 @@ def harness() -> Harness:
 
 def add_secret_relation_to_harness(harness: Harness) -> Harness:
     """Helper function to handle secret relation"""
-    harness.set_leader(True)
     secret_relation_data = {
         "_supported_versions": "- v1",
         "data": yaml.dump(SECRET_RELATION_DATA),
@@ -256,6 +255,7 @@ class TestCharm:
     )
     def test_get_interfaces_success(self, harness: Harness):
         harness = add_secret_relation_to_harness(harness)
+        harness.set_leader(True)
         harness.begin()
         interfaces = harness.charm._get_interfaces()
         assert interfaces["secrets"] != None
@@ -266,6 +266,7 @@ class TestCharm:
     )
     def test_get_manifests_success(self, harness: Harness):
         harness = add_secret_relation_to_harness(harness)
+        harness.set_leader(True)
         harness.begin()
         interfaces = harness.charm._get_interfaces()
         secrets = harness.charm._get_manifests(interfaces, "secrets")

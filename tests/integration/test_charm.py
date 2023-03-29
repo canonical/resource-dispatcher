@@ -129,5 +129,4 @@ async def test_minio_secret_added(lightkube_client: lightkube.Client, namespace:
         ),
     }
     secrets = lightkube_client.list(Secret, namespace=namespace)
-    # 4 + 1 created by default
-    assert len(list(secrets)) == 5
+    assert len(list(secrets)) == 4

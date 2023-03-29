@@ -36,10 +36,22 @@ SECRETS = [
             "AWS_ACCESS_KEY_ID": "minio",
             "AWS_SECRET_ACCESS_KEY": "NGJURYFBOOIP19XHNFHOMD02K9NG03",
         },
-    }
+    },
+    {
+        "apiVersion": "v1",
+        "kind": "Secret",
+        "metadata": {"name": "mlpipeline-minio-artifact2"},
+        "stringData": {
+            "AWS_ACCESS_KEY_ID": "minio",
+            "AWS_SECRET_ACCESS_KEY": "NGJURYFBOOIP19XHNFHOMD02K9NG03",
+        },
+    },
 ]
 
 SECRET_RELATION_DATA = {"secrets": json.dumps(SECRETS)}
+
+VALID_MANIFESTS = [{"metadata": {"name": "a"}}, {"metadata": {"name": "b"}}]
+INVALID_MANIFESTS = VALID_MANIFESTS + [{"metadata": {"name": "a"}}]
 
 
 class _FakeResponse:
@@ -252,21 +264,21 @@ class TestCharm:
         "charm.KubernetesServicePatch",
         lambda x, y, service_name, service_type, refresh_event: None,
     )
-    def test_get_secrets_success(self, harness: Harness):
+    def test_get_manifests_success(self, harness: Harness):
         harness = add_secret_relation_to_harness(harness)
         harness.begin()
         interfaces = harness.charm._get_interfaces()
-        secrets = harness.charm._get_secrets(interfaces)
+        secrets = harness.charm._get_manifests(interfaces, "secrets")
         assert secrets == SECRETS
 
     @patch(
         "charm.KubernetesServicePatch",
         lambda x, y, service_name, service_type, refresh_event: None,
     )
-    def test_get_secrets_no_secret_dat_success(self, harness: Harness):
+    def test_get_manifests_no_secret_dat_success(self, harness: Harness):
         interfaces = {"secrets": {}}
         harness.begin()
-        secrets = harness.charm._get_secrets(interfaces)
+        secrets = harness.charm._get_manifests(interfaces, "secrets")
 
         assert secrets == None
 
@@ -274,27 +286,68 @@ class TestCharm:
         "charm.KubernetesServicePatch",
         lambda x, y, service_name, service_type, refresh_event: None,
     )
-    def test_get_secrets_no_secret_failure(self, harness: Harness):
+    def test_get_manifests_no_secret_failure(self, harness: Harness):
         secret_object = MagicMock()
-        secret_object.get_data = MagicMock()
+        get_data_object = MagicMock()
+        get_data_object.return_value = lambda: []
+        secret_object.get_data = get_data_object
         interfaces = {"secrets": secret_object}
         harness.begin()
-
         with pytest.raises(ErrorWithStatus) as e_info:
-            _ = harness.charm._get_secrets(interfaces)
-        assert "Unexpected error unpacking secret data - data format not " in str(e_info)
+            harness.charm._get_manifests(interfaces, "secrets")
+        assert "Unexpected error unpacking secrets data - data format not " in str(e_info)
         assert e_info.value.status_type(BlockedStatus)
 
     @patch(
         "charm.KubernetesServicePatch",
         lambda x, y, service_name, service_type, refresh_event: None,
     )
-    @patch("charm.ResourceDispatcherOperator._get_secrets")
-    @patch("charm.ResourceDispatcherOperator._push_manifests")
-    def test_update_secrets(
-        self, push_manifests: MagicMock, get_secrets: MagicMock, harness: Harness
-    ):
-        get_secrets.return_value = ""
+    def test_manifests_valid_true(self, harness: Harness):
         harness.begin()
-        harness.charm._update_secrets(None, "")
+        response = harness.charm._manifests_valid(VALID_MANIFESTS)
+        assert response == True
+
+    @patch(
+        "charm.KubernetesServicePatch",
+        lambda x, y, service_name, service_type, refresh_event: None,
+    )
+    def test_manifests_valid_false(self, harness: Harness):
+        harness.begin()
+        response = harness.charm._manifests_valid(INVALID_MANIFESTS)
+        assert response == False
+
+    @patch(
+        "charm.KubernetesServicePatch",
+        lambda x, y, service_name, service_type, refresh_event: None,
+    )
+    @patch("charm.ResourceDispatcherOperator._get_manifests")
+    @patch("charm.ResourceDispatcherOperator._push_manifests")
+    def test_update_manifests_success(
+        self, push_manifests: MagicMock, get_manifests: MagicMock, harness: Harness
+    ):
+        get_manifests.return_value = ""
+        harness.begin()
+        harness.charm._update_manifests(None, "", "secrets")
         push_manifests.assert_called_with("", "")
+
+    @patch(
+        "charm.KubernetesServicePatch",
+        lambda x, y, service_name, service_type, refresh_event: None,
+    )
+    @patch("charm.ResourceDispatcherOperator._get_manifests")
+    @patch("charm.ResourceDispatcherOperator._push_manifests")
+    @patch("charm.ResourceDispatcherOperator._manifests_valid")
+    def test_update_manifests_invalid_manifests(
+        self,
+        manifests_valid: MagicMock,
+        _: MagicMock,
+        get_manifests: MagicMock,
+        harness: Harness,
+    ):
+        manifests_valid.return_value = False
+        get_manifests.return_value = ""
+        harness.begin()
+        with pytest.raises(ErrorWithStatus) as e_info:
+            harness.charm._update_manifests(None, "", "secrets")
+        assert "Manifests names in all relations must be valid, received manifests " in str(e_info)
+        assert e_info.value.status_type(WaitingStatus)

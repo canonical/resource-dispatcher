@@ -5,7 +5,6 @@
 
 import json
 import logging
-import uuid
 
 import yaml
 from charmed_kubeflow_chisme.exceptions import ErrorWithStatus, GenericCharmRuntimeError
@@ -112,6 +111,11 @@ class ResourceDispatcherOperator(CharmBase):
             self.logger.info("Not a leader, skipping setup")
             raise ErrorWithStatus("Waiting for leadership", WaitingStatus)
 
+    def _check_container(self):
+        """Check if we can connect the container."""
+        if not self.container.can_connect():
+            raise ErrorWithStatus("Container is not ready", WaitingStatus)
+
     def _deploy_k8s_resources(self) -> None:
         """Deploys K8S resources."""
         try:
@@ -138,39 +142,6 @@ class ResourceDispatcherOperator(CharmBase):
             raise ErrorWithStatus(err, BlockedStatus)
         return interfaces
 
-    def _get_secrets(self, interfaces):
-        """Unpacks and returns the secret relation data."""
-
-        if not ((secrets := interfaces["secrets"]) and secrets.get_data()):
-            logging.info("No secret data presented in relation")
-            return None
-
-        try:
-            secrets = list(secrets.get_data().values())[0]
-        except Exception as e:
-            raise ErrorWithStatus(
-                f"Unexpected error unpacking secret data - data format not "
-                f"as expected. Caught exception: '{str(e)}'",
-                BlockedStatus,
-            )
-
-        secrets = json.loads(secrets["secrets"])
-        return secrets
-
-    def _push_manifests(self, manifests, push_location):
-        """Push list of manifests into layer.
-
-        Args:
-            manifests: List of kubernetes manifests to be pushed to pebble layer
-            push_location: Container location where the manifests should be pushed to.
-        """
-        for manifest in manifests:
-            filename = manifest["metadata"].get(
-                "name", (uuid.uuid4())
-            )  # Use the manifest name or generate one if not presented
-            self.container.push(f"{push_location}/{filename}.yaml", yaml.dump(manifest))
-        logging.info(self.container.list_files(push_location))
-
     def _update_layer(self) -> None:
         """Update the Pebble configuration layer (if changed)."""
         current_layer = self.container.get_plan()
@@ -184,21 +155,68 @@ class ResourceDispatcherOperator(CharmBase):
             except ChangeError as err:
                 raise GenericCharmRuntimeError(f"Failed to replan with error: {str(err)}") from err
 
-    def _update_secrets(self, interfaces, dispatch_folder):
-        """Get secrets from relation and update them in dispatcher folder."""
-        secrets = self._get_secrets(interfaces)
-        logging.info(f"received secrets are {secrets}")
-        if secrets is not None:
-            self._push_manifests(secrets, dispatch_folder)
+    def _get_manifests(self, interfaces, relation):
+        """Unpacks and returns the manifests relation data."""
+        if not ((manifests := interfaces[relation]) and manifests.get_data()):
+            logging.info(f"No {relation} data presented in relation")
+            return None
+        try:
+            relations_manifests = list(manifests.get_data().values())
+        except Exception as e:
+            raise ErrorWithStatus(
+                f"Unexpected error unpacking {relation} data - data format not "
+                f"as expected. Caught exception: '{str(e)}'",
+                BlockedStatus,
+            )
+        manifests = []
+        for relation_manifests in relations_manifests:
+            manifests += json.loads(relation_manifests[relation])
+        return manifests
+
+    def _manifests_valid(self, manifests):
+        """Checks if manifests are unique."""
+        if manifests:
+            for manifest in manifests:
+                if (
+                    sum([m["metadata"]["name"] == manifest["metadata"]["name"] for m in manifests])
+                    > 1
+                ):
+                    return False
+        return True
+
+    def _push_manifests(self, manifests, push_location):
+        """Push list of manifests into layer.
+
+        Args:
+            manifests: List of kubernetes manifests to be pushed to pebble layer.
+            push_location: Container location where the manifests should be pushed to.
+            relation: name of relation being handled.
+        """
+        for manifest in manifests:
+            filename = manifest["metadata"]["name"]
+            self.container.push(f"{push_location}/{filename}.yaml", yaml.dump(manifest))
+        logging.info(self.container.list_files(push_location))
+
+    def _update_manifests(self, interfaces, dispatch_folder, relation):
+        """Get manifests from relation and update them in dispatcher folder."""
+        manifests = self._get_manifests(interfaces, relation)
+        if not self._manifests_valid(manifests):
+            raise ErrorWithStatus(
+                f"Manifests names in all relations must be valid, received manifests {manifests}",
+                WaitingStatus,
+            )
+        logging.info(f"received {relation} are {manifests}")
+        if manifests is not None:
+            self._push_manifests(manifests, dispatch_folder)
 
     def _on_event(self, event) -> None:
         """Perform all required actions for the Charm."""
         try:
             self._check_leader()
-            self._deploy_k8s_resources()
+            self._check_container()
             interfaces = self._get_interfaces()
             self._update_layer()
-            self._update_secrets(interfaces, DISPATCHER_SECRETS_PATH)
+            self._update_manifests(interfaces, DISPATCHER_SECRETS_PATH, "secrets")
         except ErrorWithStatus as err:
             self.model.unit.status = err.status
             self.logger.info(f"Event {event} stopped early with message: {str(err)}")

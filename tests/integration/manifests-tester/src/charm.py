@@ -18,8 +18,6 @@ from serialized_data_interface import NoCompatibleVersions, NoVersionsListed, ge
 
 logger = logging.getLogger(__name__)
 
-SECRETS_FOLDER = "src/secrets"
-
 
 class ManifestsTesterCharm(CharmBase):
     """Charm for sending manifests to ResourceDispatcher relations."""
@@ -27,8 +25,10 @@ class ManifestsTesterCharm(CharmBase):
     def __init__(self, *args):
         super().__init__(*args)
         self._name = "manifests-tester"
+        self._secrets_folder = self.model.config["test_data"]
 
         self.framework.observe(self.on.start, self._on_start)
+        self.framework.observe(self.on.config_changed, self._on_event)
 
         for rel in self.model.relations.keys():
             self.framework.observe(self.on[rel].relation_changed, self._on_event)
@@ -51,8 +51,9 @@ class ManifestsTesterCharm(CharmBase):
 
     def _send_manifests(self, interfaces, folder, relation):
         """Send manifests from folder to desired relation."""
-        if interfaces[relation]:
+        if relation in interfaces and interfaces[relation]:
             manifests = []
+            logger.info(f"Scanning folder {folder}")
             manifest_files = glob.glob(f"{folder}/*.yaml")
             for file in manifest_files:
                 manifest = yaml.safe_load(Path(file).read_text())
@@ -63,7 +64,7 @@ class ManifestsTesterCharm(CharmBase):
     def _on_event(self, _) -> None:
         """Perform all required actions for the Charm."""
         interfaces = self._get_interfaces()
-        self._send_manifests(interfaces, SECRETS_FOLDER, "secrets")
+        self._send_manifests(interfaces, self._secrets_folder, "secrets")
         self.model.unit.status = ActiveStatus()
 
 

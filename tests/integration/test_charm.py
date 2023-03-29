@@ -16,7 +16,8 @@ from pytest_operator.plugin import OpsTest
 logger = logging.getLogger(__name__)
 
 CHARM_NAME = "resource-dispatcher"
-MANIFEST_CHARM_NAME = "manifests-tester"
+MANIFEST_CHARM_NAME1 = "manifests-tester1"
+MANIFEST_CHARM_NAME2 = "manifests-tester2"
 METACONTROLLER_CHARM_NAME = "metacontroller-operator"
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 NAMESPACE_FILE = "./tests/integration/namespace.yaml"
@@ -92,14 +93,21 @@ async def test_build_and_deploy_charms(ops_test: OpsTest):
     build_manifests_charm_path = await ops_test.build_charm("./tests/integration/manifests-tester")
     await ops_test.model.deploy(
         entity_url=build_manifests_charm_path,
-        application_name=MANIFEST_CHARM_NAME,
+        application_name=MANIFEST_CHARM_NAME1,
         trust=True,
     )
+    await ops_test.model.deploy(
+        entity_url=build_manifests_charm_path,
+        application_name=MANIFEST_CHARM_NAME2,
+        trust=True,
+        config={"test_data": "src/secrets2"},
+    )
 
-    await ops_test.model.relate(CHARM_NAME, MANIFEST_CHARM_NAME)
+    await ops_test.model.relate(CHARM_NAME, MANIFEST_CHARM_NAME1)
+    await ops_test.model.relate(CHARM_NAME, MANIFEST_CHARM_NAME2)
 
     await ops_test.model.wait_for_idle(
-        apps=[CHARM_NAME, METACONTROLLER_CHARM_NAME, MANIFEST_CHARM_NAME],
+        apps=[CHARM_NAME, METACONTROLLER_CHARM_NAME, MANIFEST_CHARM_NAME1, MANIFEST_CHARM_NAME2],
         status="active",
         raise_on_blocked=False,
         raise_on_error=False,
@@ -120,3 +128,6 @@ async def test_minio_secret_added(lightkube_client: lightkube.Client, namespace:
             "utf-8"
         ),
     }
+    secrets = lightkube_client.list(Secret, namespace=namespace)
+    # 4 + 1 created by default
+    assert len(list(secrets)) == 5

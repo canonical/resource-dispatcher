@@ -11,3 +11,5 @@ __pycache__/
 kubeconfig.tmp
 new_config
 .mypy_cache
+
+namespace-example.yaml

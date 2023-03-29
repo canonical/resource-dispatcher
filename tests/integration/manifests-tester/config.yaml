@@ -3,4 +3,7 @@
 #
 # See https://juju.is/docs/config for guidance.
 
-options: {}
+options:
+  test_data:
+    default: src/secrets
+    type: string

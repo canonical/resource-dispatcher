@@ -366,7 +366,5 @@ class TestCharm:
         harness.begin()
         with pytest.raises(ErrorWithStatus) as e_info:
             harness.charm._update_manifests(None, "", "secrets", None)
-        assert "Failed to process invalid manifest. See debug logs" in str(
-            e_info
-        )
+        assert "Failed to process invalid manifest. See debug logs" in str(e_info)
         assert e_info.value.status_type(BlockedStatus)

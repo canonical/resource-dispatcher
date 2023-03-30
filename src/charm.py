@@ -222,9 +222,11 @@ class ResourceDispatcherOperator(CharmBase):
         """Get manifests from relation and update them in dispatcher folder."""
         manifests = self._get_manifests(interfaces, relation, event)
         if not self._manifests_valid(manifests):
-            self.logger.debug(f"Manifests names in all relations must be unique, received manifests {manifests}")
+            self.logger.debug(
+                f"Manifests names in all relations must be unique, received manifests {manifests}"
+            )
             raise ErrorWithStatus(
-                f"Failed to process invalid manifest. See debug logs.",
+                "Failed to process invalid manifest. See debug logs.",
                 BlockedStatus,
             )
         logging.info(f"received {relation} are {manifests}")

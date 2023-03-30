@@ -366,7 +366,7 @@ class TestCharm:
         harness.begin()
         with pytest.raises(ErrorWithStatus) as e_info:
             harness.charm._update_manifests(None, "", "secrets", None)
-        assert "Manifests names in all relations must be unique, received manifests " in str(
+        assert "Failed to process invalid manifest. See debug logs" in str(
             e_info
         )
         assert e_info.value.status_type(BlockedStatus)

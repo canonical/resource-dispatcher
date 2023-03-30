@@ -57,7 +57,7 @@ def lightkube_client() -> lightkube.Client:
     return client
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def namespace(lightkube_client: lightkube.Client):
     yaml_text = _safe_load_file_to_text(NAMESPACE_FILE)
     yaml_rendered = yaml.safe_load(yaml_text)
@@ -72,7 +72,7 @@ def namespace(lightkube_client: lightkube.Client):
 
 
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy_charms(ops_test: OpsTest):
+async def test_build_and_deploy_dispatcher_charm(ops_test: OpsTest):
     await ops_test.model.deploy(
         entity_url=METACONTROLLER_CHARM_NAME,
         channel="latest/edge",
@@ -90,6 +90,19 @@ async def test_build_and_deploy_charms(ops_test: OpsTest):
         trust=True,
     )
 
+    await ops_test.model.wait_for_idle(
+        apps=[CHARM_NAME, METACONTROLLER_CHARM_NAME],
+        status="active",
+        raise_on_blocked=False,
+        raise_on_error=False,
+        timeout=300,
+    )
+
+    assert ops_test.model.applications[CHARM_NAME].units[0].workload_status == "active"
+
+
+@pytest.mark.abort_on_fail
+async def test_build_and_deploy_helper_charms(ops_test: OpsTest):
     build_manifests_charm_path = await ops_test.build_charm("./tests/integration/manifests-tester")
     await ops_test.model.deploy(
         entity_url=build_manifests_charm_path,
@@ -117,7 +130,9 @@ async def test_build_and_deploy_charms(ops_test: OpsTest):
 
 
 @pytest.mark.abort_on_fail
-async def test_minio_secret_added(lightkube_client: lightkube.Client, namespace: str) -> None:
+async def test_secrets_created_from_both_helpers(
+    lightkube_client: lightkube.Client, namespace: str
+) -> None:
     time.sleep(
         30
     )  # sync can take up to 10 seconds for reconciliation loop to trigger (+ time to create namespace)

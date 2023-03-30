@@ -18,15 +18,3 @@ provides:
         required:
         - secrets
     versions: [v1]
-  # poddefaults:
-  #   interface: poddefaults
-  #   schema:
-  #     v1:
-  #       provides:
-  #         type: object
-  #         properties:
-  #           poddefaults:
-  #             type: string
-  #       required:
-  #       - poddefaults
-  #   versions: [v1]

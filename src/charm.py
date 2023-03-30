@@ -159,7 +159,7 @@ class ResourceDispatcherOperator(CharmBase):
     def _get_manifests(self, interfaces, relation, event):
         """Unpacks and returns the manifests relation data."""
         if not ((relation_interface := interfaces[relation]) and relation_interface.get_data()):
-            logging.info(f"No {relation} data presented in relation")
+            self.logger.info(f"No {relation} data presented in relation")
             return None
         try:
             relations_data = {
@@ -181,7 +181,7 @@ class ResourceDispatcherOperator(CharmBase):
         manifests = []
         for relation_data in relations_data.values():
             manifests += json.loads(relation_data[relation])
-        self.logger.info(f"manifests are {manifests}")
+        self.logger.debug(f"manifests are {manifests}")
         return manifests
 
     def _manifests_valid(self, manifests):
@@ -223,13 +223,13 @@ class ResourceDispatcherOperator(CharmBase):
         manifests = self._get_manifests(interfaces, relation, event)
         if not self._manifests_valid(manifests):
             self.logger.debug(
-                f"Manifests names in all relations must be unique, received manifests {manifests}"
+                f"Manifests names in all relations must be unique, received manifests {','.join(manifests)}"
             )
             raise ErrorWithStatus(
                 "Failed to process invalid manifest. See debug logs.",
                 BlockedStatus,
             )
-        logging.info(f"received {relation} are {manifests}")
+        self.logger.debug(f"received {relation} are {manifests}")
         self._sync_manifests(manifests, dispatch_folder)
 
     def _on_event(self, event) -> None:

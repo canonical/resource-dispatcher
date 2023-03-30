@@ -13,7 +13,7 @@ from ops.pebble import ChangeError, Service
 from ops.testing import Harness
 from serialized_data_interface import NoCompatibleVersions, NoVersionsListed
 
-from charm import DISPATCHER_SECRETS_PATH, ResourceDispatcherOperator
+from charm import ResourceDispatcherOperator
 
 EXPECTED_SERVICE = {
     "resource-dispatcher": Service(
@@ -120,8 +120,11 @@ class TestCharm:
     )
     @patch("charm.ResourceDispatcherOperator.k8s_resource_handler")
     def test_check_leader_failure(self, _: MagicMock, harness: Harness):
-        harness.begin_with_initial_hooks()
-        assert harness.charm.model.unit.status == WaitingStatus("Waiting for leadership")
+        harness.begin()
+        with pytest.raises(ErrorWithStatus) as e_info:
+            harness.charm._check_leader()
+        assert "Waiting for leadership" in str(e_info)
+        assert e_info.value.status_type(WaitingStatus)
 
     @patch(
         "charm.KubernetesServicePatch",
@@ -130,8 +133,21 @@ class TestCharm:
     @patch("charm.ResourceDispatcherOperator.k8s_resource_handler")
     def test_check_leader_success(self, _: MagicMock, harness: Harness):
         harness.set_leader(True)
-        harness.begin_with_initial_hooks()
-        assert harness.charm.model.unit.status != WaitingStatus("Waiting for leadership")
+        harness.begin()
+        try:
+            harness.charm._check_leader()
+        except ErrorWithStatus:
+            pytest.fail("check_leader_success should not raise ErrorWithStatus")
+
+    @patch(
+        "charm.KubernetesServicePatch",
+        lambda x, y, service_name, service_type, refresh_event: None,
+    )
+    @patch("charm.ResourceDispatcherOperator._deploy_k8s_resources")
+    def test_on_install_success(self, deploy_k8s_resources: MagicMock, harness: Harness):
+        harness.begin()
+        harness.charm._on_install(None)
+        deploy_k8s_resources.assert_called()
 
     @patch(
         "charm.KubernetesServicePatch",
@@ -269,7 +285,7 @@ class TestCharm:
         harness.set_leader(True)
         harness.begin()
         interfaces = harness.charm._get_interfaces()
-        secrets = harness.charm._get_manifests(interfaces, "secrets")
+        secrets = harness.charm._get_manifests(interfaces, "secrets", None)
         assert secrets == SECRETS
 
     @patch(
@@ -279,7 +295,7 @@ class TestCharm:
     def test_get_manifests_no_secret_dat_success(self, harness: Harness):
         interfaces = {"secrets": {}}
         harness.begin()
-        secrets = harness.charm._get_manifests(interfaces, "secrets")
+        secrets = harness.charm._get_manifests(interfaces, "secrets", None)
 
         assert secrets == None
 
@@ -295,7 +311,7 @@ class TestCharm:
         interfaces = {"secrets": secret_object}
         harness.begin()
         with pytest.raises(ErrorWithStatus) as e_info:
-            harness.charm._get_manifests(interfaces, "secrets")
+            harness.charm._get_manifests(interfaces, "secrets", None)
         assert "Unexpected error unpacking secrets data - data format not " in str(e_info)
         assert e_info.value.status_type(BlockedStatus)
 
@@ -322,21 +338,21 @@ class TestCharm:
         lambda x, y, service_name, service_type, refresh_event: None,
     )
     @patch("charm.ResourceDispatcherOperator._get_manifests")
-    @patch("charm.ResourceDispatcherOperator._push_manifests")
+    @patch("charm.ResourceDispatcherOperator._sync_manifests")
     def test_update_manifests_success(
-        self, push_manifests: MagicMock, get_manifests: MagicMock, harness: Harness
+        self, sync_manifests: MagicMock, get_manifests: MagicMock, harness: Harness
     ):
         get_manifests.return_value = ""
         harness.begin()
-        harness.charm._update_manifests(None, "", "secrets")
-        push_manifests.assert_called_with("", "")
+        harness.charm._update_manifests(None, "", "secrets", None)
+        sync_manifests.assert_called_with("", "")
 
     @patch(
         "charm.KubernetesServicePatch",
         lambda x, y, service_name, service_type, refresh_event: None,
     )
     @patch("charm.ResourceDispatcherOperator._get_manifests")
-    @patch("charm.ResourceDispatcherOperator._push_manifests")
+    @patch("charm.ResourceDispatcherOperator._sync_manifests")
     @patch("charm.ResourceDispatcherOperator._manifests_valid")
     def test_update_manifests_invalid_manifests(
         self,
@@ -349,6 +365,8 @@ class TestCharm:
         get_manifests.return_value = ""
         harness.begin()
         with pytest.raises(ErrorWithStatus) as e_info:
-            harness.charm._update_manifests(None, "", "secrets")
-        assert "Manifests names in all relations must be valid, received manifests " in str(e_info)
+            harness.charm._update_manifests(None, "", "secrets", None)
+        assert "Manifests names in all relations must be unique, received manifests " in str(
+            e_info
+        )
         assert e_info.value.status_type(BlockedStatus)

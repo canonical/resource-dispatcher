@@ -14,7 +14,7 @@ from charms.observability_libs.v1.kubernetes_service_patch import KubernetesServ
 from lightkube import ApiError
 from lightkube.generic_resource import load_in_cluster_generic_resources
 from lightkube.models.core_v1 import ServicePort
-from ops.charm import CharmBase
+from ops.charm import CharmBase, RelationBrokenEvent
 from ops.main import main
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus
 from ops.pebble import ChangeError, Layer
@@ -156,22 +156,32 @@ class ResourceDispatcherOperator(CharmBase):
             except ChangeError as err:
                 raise GenericCharmRuntimeError(f"Failed to replan with error: {str(err)}") from err
 
-    def _get_manifests(self, interfaces, relation):
+    def _get_manifests(self, interfaces, relation, event):
         """Unpacks and returns the manifests relation data."""
-        if not ((manifests := interfaces[relation]) and manifests.get_data()):
+        if not ((relation_interface := interfaces[relation]) and relation_interface.get_data()):
             logging.info(f"No {relation} data presented in relation")
             return None
         try:
-            relations_manifests = list(manifests.get_data().values())
+            relations_data = {
+                (rel, app): route
+                for (rel, app), route in sorted(
+                    relation_interface.get_data().items(), key=lambda tup: tup[0][0].id
+                )
+                if app != self.app
+            }
         except Exception as e:
             raise ErrorWithStatus(
                 f"Unexpected error unpacking {relation} data - data format not "
                 f"as expected. Caught exception: '{str(e)}'",
                 BlockedStatus,
             )
+        if isinstance(event, (RelationBrokenEvent)):
+            del relations_data[(event.relation, event.app)]
+
         manifests = []
-        for relation_manifests in relations_manifests:
-            manifests += json.loads(relation_manifests[relation])
+        for relation_data in relations_data.values():
+            manifests += json.loads(relation_data[relation])
+        self.logger.info(f"manifests are {manifests}")
         return manifests
 
     def _manifests_valid(self, manifests):
@@ -191,7 +201,6 @@ class ResourceDispatcherOperator(CharmBase):
         Args:
             manifests: List of kubernetes manifests to be pushed to pebble layer.
             push_location: Container location where the manifests should be pushed to.
-            relation: name of relation being handled.
         """
         all_files = self.container.list_files(push_location)
         if manifests:
@@ -200,26 +209,21 @@ class ResourceDispatcherOperator(CharmBase):
             ]
         else:
             manifests_locations = []
-        self.logger.info(f"all_files {all_files}")
-        self.logger.info(f"manifests_names {manifests_locations}")
         if all_files:
             for file in all_files:
-                self.logger.info(f"Checking file {file.path}")
                 if file.path not in manifests_locations:
-                    self.logger.info(f"Removing file {file.path}")
                     self.container.remove_path(file.path)
         if manifests:
             for manifest in manifests:
                 filename = manifest["metadata"]["name"]
                 self.container.push(f"{push_location}/{filename}.yaml", yaml.dump(manifest))
-        logging.info(self.container.list_files(push_location))
 
-    def _update_manifests(self, interfaces, dispatch_folder, relation):
+    def _update_manifests(self, interfaces, dispatch_folder, relation, event):
         """Get manifests from relation and update them in dispatcher folder."""
-        manifests = self._get_manifests(interfaces, relation)
+        manifests = self._get_manifests(interfaces, relation, event)
         if not self._manifests_valid(manifests):
             raise ErrorWithStatus(
-                f"Manifests names in all relations must be valid, received manifests {manifests}",
+                f"Manifests names in all relations must be unique, received manifests {manifests}",
                 BlockedStatus,
             )
         logging.info(f"received {relation} are {manifests}")
@@ -232,7 +236,7 @@ class ResourceDispatcherOperator(CharmBase):
             self._check_container()
             interfaces = self._get_interfaces()
             self._update_layer()
-            self._update_manifests(interfaces, DISPATCHER_SECRETS_PATH, "secrets")
+            self._update_manifests(interfaces, DISPATCHER_SECRETS_PATH, "secrets", event)
         except ErrorWithStatus as err:
             self.model.unit.status = err.status
             self.logger.info(f"Event {event} stopped early with message: {str(err)}")

@@ -3,6 +3,7 @@
 
 import base64
 import logging
+import subprocess
 import time
 from pathlib import Path
 
@@ -145,3 +146,27 @@ async def test_secrets_created_from_both_helpers(
     }
     secrets = lightkube_client.list(Secret, namespace=namespace)
     assert len(list(secrets)) == 4
+
+
+@pytest.mark.abort_on_fail
+async def test_remove_relation(ops_test: OpsTest):
+    subprocess.Popen(["juju", "remove-relation", CHARM_NAME, MANIFEST_CHARM_NAME1])
+    await ops_test.model.wait_for_idle(
+        apps=[CHARM_NAME, METACONTROLLER_CHARM_NAME, MANIFEST_CHARM_NAME1, MANIFEST_CHARM_NAME2],
+        status="active",
+        raise_on_blocked=False,
+        raise_on_error=False,
+        timeout=300,
+        idle_period=30
+    )
+
+
+@pytest.mark.abort_on_fail
+async def test_remove_one_helper_relation(
+    ops_test: OpsTest, lightkube_client: lightkube.Client, namespace: str
+):
+    time.sleep(
+        30
+    )  # sync can take up to 10 seconds for reconciliation loop to trigger (+ time to create namespace)
+    secrets = lightkube_client.list(Secret, namespace=namespace)
+    assert len(list(secrets)) == 2

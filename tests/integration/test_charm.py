@@ -157,7 +157,7 @@ async def test_remove_relation(ops_test: OpsTest):
         raise_on_blocked=False,
         raise_on_error=False,
         timeout=300,
-        idle_period=30
+        idle_period=30,
     )
 
 

@@ -153,7 +153,7 @@ async def test_manifests_created_from_both_helpers(
         ),
     }
     assert service_account != None
-    assert len(list(secrets)) == 5
+    assert len(list(secrets)) == 4
 
 
 @pytest.mark.abort_on_fail

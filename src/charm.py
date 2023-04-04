@@ -21,7 +21,7 @@ from ops.pebble import ChangeError, Layer
 from serialized_data_interface import NoCompatibleVersions, NoVersionsListed, get_interfaces
 
 K8S_RESOURCE_FILES = ["src/templates/composite-controller.yaml.j2"]
-DISPATCHER_SECRETS_PATH = "/app/resources"
+DISPATCHER_RESOURCES_PATH = "/app/resources"
 
 
 class ResourceDispatcherOperator(CharmBase):
@@ -175,8 +175,10 @@ class ResourceDispatcherOperator(CharmBase):
                 f"as expected. Caught exception: '{str(e)}'",
                 BlockedStatus,
             )
+        self.logger.info(f"data is {relations_data}")
         if isinstance(event, (RelationBrokenEvent)):
-            del relations_data[(event.relation, event.app)]
+            if (event.relation, event.app) in relations_data:
+                del relations_data[(event.relation, event.app)]
 
         manifests = []
         for relation_data in relations_data.values():
@@ -239,7 +241,15 @@ class ResourceDispatcherOperator(CharmBase):
             self._check_container()
             interfaces = self._get_interfaces()
             self._update_layer()
-            self._update_manifests(interfaces, DISPATCHER_SECRETS_PATH, "secrets", event)
+            self._update_manifests(
+                interfaces, f"{DISPATCHER_RESOURCES_PATH}/secrets", "secrets", event
+            )
+            self._update_manifests(
+                interfaces,
+                f"{DISPATCHER_RESOURCES_PATH}/service-accounts",
+                "service-accounts",
+                event,
+            )
         except ErrorWithStatus as err:
             self.model.unit.status = err.status
             self.logger.info(f"Event {event} stopped early with message: {str(err)}")

@@ -14,7 +14,7 @@ resources:
   oci-image:
     type: oci-image
     description: Backing OCI image
-    upstream-source: charmedkubeflow/resource-dispatcher:1.0_beta-22.04
+    upstream-source: misohu/kubeflow-resource-dispatcher:15.0.0
 requires:
   secrets:
     interface: secrets
@@ -27,4 +27,16 @@ requires:
               type: string
         required:
         - secrets
+    versions: [v1]
+  service-accounts:
+    interface: service-accounts
+    schema:
+      v1:
+        provides:
+          type: object
+          properties:
+            service-accounts:
+              type: string
+        required:
+        - service-accounts
     versions: [v1]

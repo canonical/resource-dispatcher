@@ -25,7 +25,7 @@ class ManifestsTesterCharm(CharmBase):
     def __init__(self, *args):
         super().__init__(*args)
         self._name = "manifests-tester"
-        self._secrets_folder = self.model.config["test_data"]
+        self._manifests_folder = self.model.config["manifests_folder"]
 
         self.framework.observe(self.on.start, self._on_start)
         self.framework.observe(self.on.config_changed, self._on_event)
@@ -43,18 +43,18 @@ class ManifestsTesterCharm(CharmBase):
             interfaces = get_interfaces(self)
         except NoVersionsListed:
             self.model.unit.status = WaitingStatus()
-            return {"secrets": None}
+            return {"secrets": None, "service-accounts": None}
         except NoCompatibleVersions:
             self.model.unit.status = BlockedStatus()
-            return {"secrets": None}
+            return {"secrets": None, "service-accounts": None}
         return interfaces
 
     def _send_manifests(self, interfaces, folder, relation):
         """Send manifests from folder to desired relation."""
         if relation in interfaces and interfaces[relation]:
             manifests = []
-            logger.info(f"Scanning folder {folder}")
-            manifest_files = glob.glob(f"{folder}/*.yaml")
+            logger.info(f"Scanning folder {folder}/{relation}")
+            manifest_files = glob.glob(f"{folder}/{relation}/*.yaml")
             for file in manifest_files:
                 manifest = yaml.safe_load(Path(file).read_text())
                 manifests.append(manifest)
@@ -64,7 +64,8 @@ class ManifestsTesterCharm(CharmBase):
     def _on_event(self, _) -> None:
         """Perform all required actions for the Charm."""
         interfaces = self._get_interfaces()
-        self._send_manifests(interfaces, self._secrets_folder, "secrets")
+        self._send_manifests(interfaces, self._manifests_folder, "secrets")
+        self._send_manifests(interfaces, self._manifests_folder, "service-accounts")
         self.model.unit.status = ActiveStatus()
 
 

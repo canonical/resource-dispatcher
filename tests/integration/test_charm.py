@@ -179,4 +179,4 @@ async def test_remove_one_helper_relation(
         30
     )  # sync can take up to 10 seconds for reconciliation loop to trigger (+ time to create namespace)
     secrets = lightkube_client.list(Secret, namespace=namespace)
-    assert len(list(secrets)) == 3
+    assert len(list(secrets)) == 2

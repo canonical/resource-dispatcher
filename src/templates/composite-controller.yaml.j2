@@ -12,7 +12,7 @@ spec:
     - apiVersion: v1
       resource: secrets
       updateStrategy:
-        method: OnDelete
+        method: InPlace
   hooks:
     sync:
       webhook:

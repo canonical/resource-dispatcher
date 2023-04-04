@@ -1,0 +1,20 @@
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
+name: manifests-tester
+summary: |
+  Charm for sending manifests to ResourceDispatcher relations.
+description: |
+  Charm for sending manifests to ResourceDispatcher relations.
+provides:
+  secrets:
+    interface: secrets
+    schema:
+      v1:
+        provides:
+          type: object
+          properties:
+            secrets:
+              type: string
+        required:
+        - secrets
+    versions: [v1]

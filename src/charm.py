@@ -3,8 +3,10 @@
 # See LICENSE file for licensing details.
 #
 
+import json
 import logging
 
+import yaml
 from charmed_kubeflow_chisme.exceptions import ErrorWithStatus, GenericCharmRuntimeError
 from charmed_kubeflow_chisme.kubernetes import KubernetesResourceHandler
 from charmed_kubeflow_chisme.lightkube.batch import delete_many
@@ -12,12 +14,14 @@ from charms.observability_libs.v1.kubernetes_service_patch import KubernetesServ
 from lightkube import ApiError
 from lightkube.generic_resource import load_in_cluster_generic_resources
 from lightkube.models.core_v1 import ServicePort
-from ops.charm import CharmBase
+from ops.charm import CharmBase, RelationBrokenEvent
 from ops.main import main
-from ops.model import ActiveStatus, MaintenanceStatus, WaitingStatus
+from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus
 from ops.pebble import ChangeError, Layer
+from serialized_data_interface import NoCompatibleVersions, NoVersionsListed, get_interfaces
 
 K8S_RESOURCE_FILES = ["src/templates/composite-controller.yaml.j2"]
+DISPATCHER_SECRETS_PATH = "/app/resources"
 
 
 class ResourceDispatcherOperator(CharmBase):
@@ -44,8 +48,9 @@ class ResourceDispatcherOperator(CharmBase):
         self.framework.observe(self.on.config_changed, self._on_event)
         self.framework.observe(self.on.remove, self._on_remove)
 
-        # for rel in self.model.relations.keys():
-        #     self.framework.observe(self.on[rel].relation_changed, self._on_event)
+        for rel in self.model.relations.keys():
+            self.framework.observe(self.on[rel].relation_changed, self._on_event)
+            self.framework.observe(self.on[rel].relation_broken, self._on_event)
 
         port = ServicePort(int(self._port), name=f"{self.app.name}")
         self.service_patcher = KubernetesServicePatch(
@@ -107,6 +112,11 @@ class ResourceDispatcherOperator(CharmBase):
             self.logger.info("Not a leader, skipping setup")
             raise ErrorWithStatus("Waiting for leadership", WaitingStatus)
 
+    def _check_container(self):
+        """Check if we can connect the container."""
+        if not self.container.can_connect():
+            raise ErrorWithStatus("Container is not ready", WaitingStatus)
+
     def _deploy_k8s_resources(self) -> None:
         """Deploys K8S resources."""
         try:
@@ -123,6 +133,16 @@ class ResourceDispatcherOperator(CharmBase):
         # deploy K8S resources to speed up deployment
         self._deploy_k8s_resources()
 
+    def _get_interfaces(self):
+        """Retrieve interface object."""
+        try:
+            interfaces = get_interfaces(self)
+        except NoVersionsListed as err:
+            raise ErrorWithStatus(err, WaitingStatus)
+        except NoCompatibleVersions as err:
+            raise ErrorWithStatus(err, BlockedStatus)
+        return interfaces
+
     def _update_layer(self) -> None:
         """Update the Pebble configuration layer (if changed)."""
         current_layer = self.container.get_plan()
@@ -136,13 +156,90 @@ class ResourceDispatcherOperator(CharmBase):
             except ChangeError as err:
                 raise GenericCharmRuntimeError(f"Failed to replan with error: {str(err)}") from err
 
+    def _get_manifests(self, interfaces, relation, event):
+        """Unpacks and returns the manifests relation data."""
+        if not ((relation_interface := interfaces[relation]) and relation_interface.get_data()):
+            self.logger.info(f"No {relation} data presented in relation")
+            return None
+        try:
+            relations_data = {
+                (rel, app): route
+                for (rel, app), route in sorted(
+                    relation_interface.get_data().items(), key=lambda tup: tup[0][0].id
+                )
+                if app != self.app
+            }
+        except Exception as e:
+            raise ErrorWithStatus(
+                f"Unexpected error unpacking {relation} data - data format not "
+                f"as expected. Caught exception: '{str(e)}'",
+                BlockedStatus,
+            )
+        if isinstance(event, (RelationBrokenEvent)):
+            del relations_data[(event.relation, event.app)]
+
+        manifests = []
+        for relation_data in relations_data.values():
+            manifests += json.loads(relation_data[relation])
+        self.logger.debug(f"manifests are {manifests}")
+        return manifests
+
+    def _manifests_valid(self, manifests):
+        """Checks if manifests are unique."""
+        if manifests:
+            for manifest in manifests:
+                if (
+                    sum([m["metadata"]["name"] == manifest["metadata"]["name"] for m in manifests])
+                    > 1
+                ):
+                    return False
+        return True
+
+    def _sync_manifests(self, manifests, push_location):
+        """Push list of manifests into layer.
+
+        Args:
+            manifests: List of kubernetes manifests to be pushed to pebble layer.
+            push_location: Container location where the manifests should be pushed to.
+        """
+        all_files = self.container.list_files(push_location)
+        if manifests:
+            manifests_locations = [
+                f"{push_location}/{m['metadata']['name']}.yaml" for m in manifests
+            ]
+        else:
+            manifests_locations = []
+        if all_files:
+            for file in all_files:
+                if file.path not in manifests_locations:
+                    self.container.remove_path(file.path)
+        if manifests:
+            for manifest in manifests:
+                filename = manifest["metadata"]["name"]
+                self.container.push(f"{push_location}/{filename}.yaml", yaml.dump(manifest))
+
+    def _update_manifests(self, interfaces, dispatch_folder, relation, event):
+        """Get manifests from relation and update them in dispatcher folder."""
+        manifests = self._get_manifests(interfaces, relation, event)
+        if not self._manifests_valid(manifests):
+            self.logger.debug(
+                f"Manifests names in all relations must be unique {','.join(manifests)}"
+            )
+            raise ErrorWithStatus(
+                "Failed to process invalid manifest. See debug logs.",
+                BlockedStatus,
+            )
+        self.logger.debug(f"received {relation} are {manifests}")
+        self._sync_manifests(manifests, dispatch_folder)
+
     def _on_event(self, event) -> None:
         """Perform all required actions for the Charm."""
         try:
             self._check_leader()
-            self._deploy_k8s_resources()
-            # interfaces = self._get_interfaces()
+            self._check_container()
+            interfaces = self._get_interfaces()
             self._update_layer()
+            self._update_manifests(interfaces, DISPATCHER_SECRETS_PATH, "secrets", event)
         except ErrorWithStatus as err:
             self.model.unit.status = err.status
             self.logger.info(f"Event {event} stopped early with message: {str(err)}")

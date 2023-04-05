@@ -175,7 +175,6 @@ class ResourceDispatcherOperator(CharmBase):
                 f"as expected. Caught exception: '{str(e)}'",
                 BlockedStatus,
             )
-        self.logger.info(f"data is {relations_data}")
         if isinstance(event, (RelationBrokenEvent)):
             if (event.relation, event.app) in relations_data:
                 del relations_data[(event.relation, event.app)]

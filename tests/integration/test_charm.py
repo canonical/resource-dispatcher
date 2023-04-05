@@ -158,6 +158,8 @@ async def test_manifests_created_from_both_helpers(
 
 @pytest.mark.abort_on_fail
 async def test_remove_relation(ops_test: OpsTest):
+    """Make sure that charm goes to active state after relation is removed"""
+    # There is no remove_relation method in opstest so calling it directly
     subprocess.Popen(
         ["juju", "remove-relation", f"{CHARM_NAME}:secrets", f"{MANIFEST_CHARM_NAME1}:secrets"]
     )

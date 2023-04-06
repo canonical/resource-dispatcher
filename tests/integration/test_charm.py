@@ -11,11 +11,13 @@ import lightkube
 import pytest
 import yaml
 from lightkube import codecs
+from lightkube.generic_resource import create_namespaced_resource
 from lightkube.resources.core_v1 import Secret, ServiceAccount
 from pytest_operator.plugin import OpsTest
 
 logger = logging.getLogger(__name__)
 
+ADMISSION_WEBHOOK_CHARM_NAME = "admission-webhook"
 CHARM_NAME = "resource-dispatcher"
 MANIFEST_CHARM_NAME1 = "manifests-tester1"
 MANIFEST_CHARM_NAME2 = "manifests-tester2"
@@ -25,6 +27,8 @@ NAMESPACE_FILE = "./tests/integration/namespace.yaml"
 TESTING_LABELS = ["user.kubeflow.org/enabled"]  # Might be more than one in the future
 SECRET_NAME = "mlpipeline-minio-artifact"
 SERVICE_ACCOUNT_NAME = "sa"
+
+PodDefault = create_namespaced_resource("kubeflow.org", "v1alpha1", "PodDefault", "poddefaults")
 
 
 def _safe_load_file_to_text(filename: str) -> str:
@@ -76,6 +80,12 @@ def namespace(lightkube_client: lightkube.Client):
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy_dispatcher_charm(ops_test: OpsTest):
     await ops_test.model.deploy(
+        entity_url=ADMISSION_WEBHOOK_CHARM_NAME,
+        channel="1.6/stable",
+        trust=True,
+    )
+
+    await ops_test.model.deploy(
         entity_url=METACONTROLLER_CHARM_NAME,
         channel="latest/edge",
         trust=True,
@@ -93,7 +103,7 @@ async def test_build_and_deploy_dispatcher_charm(ops_test: OpsTest):
     )
 
     await ops_test.model.wait_for_idle(
-        apps=[CHARM_NAME, METACONTROLLER_CHARM_NAME],
+        apps=[CHARM_NAME, METACONTROLLER_CHARM_NAME, ADMISSION_WEBHOOK_CHARM_NAME],
         status="active",
         raise_on_blocked=False,
         raise_on_error=False,
@@ -122,6 +132,9 @@ async def test_build_and_deploy_helper_charms(ops_test: OpsTest):
     await ops_test.model.relate(
         f"{CHARM_NAME}:service-accounts", f"{MANIFEST_CHARM_NAME1}:service-accounts"
     )
+    await ops_test.model.relate(
+        f"{CHARM_NAME}:pod-defaults", f"{MANIFEST_CHARM_NAME1}:pod-defaults"
+    )
     await ops_test.model.relate(f"{CHARM_NAME}:secrets", f"{MANIFEST_CHARM_NAME2}:secrets")
 
     await ops_test.model.wait_for_idle(
@@ -146,6 +159,7 @@ async def test_manifests_created_from_both_helpers(
         ServiceAccount, SERVICE_ACCOUNT_NAME, namespace=namespace
     )
     secrets = lightkube_client.list(Secret, namespace=namespace)
+    pod_defaults = lightkube_client.list(PodDefault, namespace=namespace)
     assert secret.data == {
         "AWS_ACCESS_KEY_ID": base64.b64encode("access_key".encode("utf-8")).decode("utf-8"),
         "AWS_SECRET_ACCESS_KEY": base64.b64encode("secret_access_key".encode("utf-8")).decode(
@@ -154,6 +168,7 @@ async def test_manifests_created_from_both_helpers(
     }
     assert service_account != None
     assert len(list(secrets)) == 4
+    assert len(list(pod_defaults)) == 2
 
 
 @pytest.mark.abort_on_fail

@@ -43,10 +43,10 @@ class ManifestsTesterCharm(CharmBase):
             interfaces = get_interfaces(self)
         except NoVersionsListed:
             self.model.unit.status = WaitingStatus()
-            return {"secrets": None, "service-accounts": None}
+            return {"secrets": None, "pod-defaults": None, "service-accounts": None}
         except NoCompatibleVersions:
             self.model.unit.status = BlockedStatus()
-            return {"secrets": None, "service-accounts": None}
+            return {"secrets": None, "pod-defaults": None, "service-accounts": None}
         return interfaces
 
     def _send_manifests(self, interfaces, folder, relation):
@@ -66,6 +66,7 @@ class ManifestsTesterCharm(CharmBase):
         interfaces = self._get_interfaces()
         self._send_manifests(interfaces, self._manifests_folder, "secrets")
         self._send_manifests(interfaces, self._manifests_folder, "service-accounts")
+        self._send_manifests(interfaces, self._manifests_folder, "pod-defaults")
         self.model.unit.status = ActiveStatus()
 
 

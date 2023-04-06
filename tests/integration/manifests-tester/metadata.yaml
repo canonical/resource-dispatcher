@@ -18,3 +18,15 @@ provides:
         required:
         - secrets
     versions: [v1]
+  service-accounts:
+    interface: service-accounts
+    schema:
+      v1:
+        provides:
+          type: object
+          properties:
+            service-accounts:
+              type: string
+        required:
+        - service-accounts
+    versions: [v1]

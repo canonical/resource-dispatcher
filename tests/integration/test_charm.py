@@ -11,7 +11,7 @@ import lightkube
 import pytest
 import yaml
 from lightkube import codecs
-from lightkube.resources.core_v1 import Secret
+from lightkube.resources.core_v1 import Secret, ServiceAccount
 from pytest_operator.plugin import OpsTest
 
 logger = logging.getLogger(__name__)
@@ -24,6 +24,7 @@ METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 NAMESPACE_FILE = "./tests/integration/namespace.yaml"
 TESTING_LABELS = ["user.kubeflow.org/enabled"]  # Might be more than one in the future
 SECRET_NAME = "mlpipeline-minio-artifact"
+SERVICE_ACCOUNT_NAME = "sa"
 
 
 def _safe_load_file_to_text(filename: str) -> str:
@@ -114,11 +115,14 @@ async def test_build_and_deploy_helper_charms(ops_test: OpsTest):
         entity_url=build_manifests_charm_path,
         application_name=MANIFEST_CHARM_NAME2,
         trust=True,
-        config={"test_data": "src/secrets2"},
+        config={"manifests_folder": "src/manifests2"},
     )
 
-    await ops_test.model.relate(CHARM_NAME, MANIFEST_CHARM_NAME1)
-    await ops_test.model.relate(CHARM_NAME, MANIFEST_CHARM_NAME2)
+    await ops_test.model.relate(f"{CHARM_NAME}:secrets", f"{MANIFEST_CHARM_NAME1}:secrets")
+    await ops_test.model.relate(
+        f"{CHARM_NAME}:service-accounts", f"{MANIFEST_CHARM_NAME1}:service-accounts"
+    )
+    await ops_test.model.relate(f"{CHARM_NAME}:secrets", f"{MANIFEST_CHARM_NAME2}:secrets")
 
     await ops_test.model.wait_for_idle(
         apps=[CHARM_NAME, METACONTROLLER_CHARM_NAME, MANIFEST_CHARM_NAME1, MANIFEST_CHARM_NAME2],
@@ -131,26 +135,34 @@ async def test_build_and_deploy_helper_charms(ops_test: OpsTest):
 
 
 @pytest.mark.abort_on_fail
-async def test_secrets_created_from_both_helpers(
+async def test_manifests_created_from_both_helpers(
     lightkube_client: lightkube.Client, namespace: str
 ) -> None:
     time.sleep(
         30
     )  # sync can take up to 10 seconds for reconciliation loop to trigger (+ time to create namespace)
     secret = lightkube_client.get(Secret, SECRET_NAME, namespace=namespace)
+    service_account = lightkube_client.get(
+        ServiceAccount, SERVICE_ACCOUNT_NAME, namespace=namespace
+    )
+    secrets = lightkube_client.list(Secret, namespace=namespace)
     assert secret.data == {
         "AWS_ACCESS_KEY_ID": base64.b64encode("access_key".encode("utf-8")).decode("utf-8"),
         "AWS_SECRET_ACCESS_KEY": base64.b64encode("secret_access_key".encode("utf-8")).decode(
             "utf-8"
         ),
     }
-    secrets = lightkube_client.list(Secret, namespace=namespace)
+    assert service_account != None
     assert len(list(secrets)) == 4
 
 
 @pytest.mark.abort_on_fail
 async def test_remove_relation(ops_test: OpsTest):
-    subprocess.Popen(["juju", "remove-relation", CHARM_NAME, MANIFEST_CHARM_NAME1])
+    """Make sure that charm goes to active state after relation is removed"""
+    # There is no remove_relation method in opstest so calling it directly
+    subprocess.Popen(
+        ["juju", "remove-relation", f"{CHARM_NAME}:secrets", f"{MANIFEST_CHARM_NAME1}:secrets"]
+    )
     await ops_test.model.wait_for_idle(
         apps=[CHARM_NAME, METACONTROLLER_CHARM_NAME, MANIFEST_CHARM_NAME1, MANIFEST_CHARM_NAME2],
         status="active",

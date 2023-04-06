@@ -13,6 +13,10 @@ spec:
       resource: secrets
       updateStrategy:
         method: InPlace
+    - apiVersion: v1
+      resource: serviceaccounts
+      updateStrategy:
+        method: InPlace
   hooks:
     sync:
       webhook:

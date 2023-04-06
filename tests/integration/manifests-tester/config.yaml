@@ -4,6 +4,6 @@
 # See https://juju.is/docs/config for guidance.
 
 options:
-  test_data:
-    default: src/secrets
+  manifests_folder:
+    default: src/manifests1
     type: string

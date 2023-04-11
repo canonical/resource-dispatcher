@@ -12,6 +12,7 @@ import pytest
 import yaml
 from charmed_kubeflow_chisme.kubernetes import KubernetesResourceHandler
 from lightkube import codecs
+from lightkube.core.exceptions import ApiError
 from lightkube.generic_resource import (
     create_namespaced_resource,
     load_in_cluster_generic_resources,
@@ -213,3 +214,7 @@ async def test_remove_one_helper_relation(
     for name in TESTER2_SECRET_NAMES:
         secret = lightkube_client.get(Secret, name, namespace=namespace)
         assert secret != None
+    for name in TESTER1_SECRET_NAMES:
+        with pytest.raises(ApiError) as e_info:
+            secret = lightkube_client.get(Secret, name, namespace=namespace)
+        assert "not found" in str(e_info)

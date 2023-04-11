@@ -10,23 +10,30 @@ from pathlib import Path
 import lightkube
 import pytest
 import yaml
+from charmed_kubeflow_chisme.kubernetes import KubernetesResourceHandler
 from lightkube import codecs
-from lightkube.generic_resource import create_namespaced_resource
+from lightkube.generic_resource import (
+    create_namespaced_resource,
+    load_in_cluster_generic_resources,
+)
 from lightkube.resources.core_v1 import Secret, ServiceAccount
 from pytest_operator.plugin import OpsTest
 
 logger = logging.getLogger(__name__)
 
-ADMISSION_WEBHOOK_CHARM_NAME = "admission-webhook"
 CHARM_NAME = "resource-dispatcher"
 MANIFEST_CHARM_NAME1 = "manifests-tester1"
 MANIFEST_CHARM_NAME2 = "manifests-tester2"
 METACONTROLLER_CHARM_NAME = "metacontroller-operator"
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 NAMESPACE_FILE = "./tests/integration/namespace.yaml"
+PODDEFAULTS_CRD_TEMPLATE = "./tests/integration/crds/poddefaults.yaml"
 TESTING_LABELS = ["user.kubeflow.org/enabled"]  # Might be more than one in the future
 SECRET_NAME = "mlpipeline-minio-artifact"
 SERVICE_ACCOUNT_NAME = "sa"
+TESTER1_SECRET_NAMES = ["mlpipeline-minio-artifact", "seldon-rclone-secret"]
+TESTER2_SECRET_NAMES = ["mlpipeline-minio-artifact2", "seldon-rclone-secret2"]
+PODDEFAULTS_NAMES = ["access-minio", "mlflow-server-minio"]
 
 PodDefault = create_namespaced_resource("kubeflow.org", "v1alpha1", "PodDefault", "poddefaults")
 
@@ -63,6 +70,15 @@ def lightkube_client() -> lightkube.Client:
     return client
 
 
+def deploy_k8s_resources(template_files: str):
+    lightkube_client = lightkube.Client(field_manager=CHARM_NAME)
+    k8s_resource_handler = KubernetesResourceHandler(
+        field_manager=CHARM_NAME, template_files=template_files, context={}
+    )
+    load_in_cluster_generic_resources(lightkube_client)
+    k8s_resource_handler.apply()
+
+
 @pytest.fixture(scope="function")
 def namespace(lightkube_client: lightkube.Client):
     yaml_text = _safe_load_file_to_text(NAMESPACE_FILE)
@@ -79,11 +95,7 @@ def namespace(lightkube_client: lightkube.Client):
 
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy_dispatcher_charm(ops_test: OpsTest):
-    await ops_test.model.deploy(
-        entity_url=ADMISSION_WEBHOOK_CHARM_NAME,
-        channel="1.6/stable",
-        trust=True,
-    )
+    deploy_k8s_resources([PODDEFAULTS_CRD_TEMPLATE])
 
     await ops_test.model.deploy(
         entity_url=METACONTROLLER_CHARM_NAME,
@@ -103,7 +115,7 @@ async def test_build_and_deploy_dispatcher_charm(ops_test: OpsTest):
     )
 
     await ops_test.model.wait_for_idle(
-        apps=[CHARM_NAME, METACONTROLLER_CHARM_NAME, ADMISSION_WEBHOOK_CHARM_NAME],
+        apps=[CHARM_NAME, METACONTROLLER_CHARM_NAME],
         status="active",
         raise_on_blocked=False,
         raise_on_error=False,
@@ -158,8 +170,7 @@ async def test_manifests_created_from_both_helpers(
     service_account = lightkube_client.get(
         ServiceAccount, SERVICE_ACCOUNT_NAME, namespace=namespace
     )
-    secrets = lightkube_client.list(Secret, namespace=namespace)
-    pod_defaults = lightkube_client.list(PodDefault, namespace=namespace)
+    # Teting one secret for content
     assert secret.data == {
         "AWS_ACCESS_KEY_ID": base64.b64encode("access_key".encode("utf-8")).decode("utf-8"),
         "AWS_SECRET_ACCESS_KEY": base64.b64encode("secret_access_key".encode("utf-8")).decode(
@@ -167,8 +178,12 @@ async def test_manifests_created_from_both_helpers(
         ),
     }
     assert service_account != None
-    assert len(list(secrets)) == 4
-    assert len(list(pod_defaults)) == 2
+    for name in TESTER1_SECRET_NAMES + TESTER2_SECRET_NAMES:
+        secret = lightkube_client.get(Secret, name, namespace=namespace)
+        assert secret != None
+    for name in PODDEFAULTS_NAMES:
+        pod_default = lightkube_client.get(PodDefault, name, namespace=namespace)
+        assert pod_default != None
 
 
 @pytest.mark.abort_on_fail
@@ -195,5 +210,6 @@ async def test_remove_one_helper_relation(
     time.sleep(
         30
     )  # sync can take up to 10 seconds for reconciliation loop to trigger (+ time to create namespace)
-    secrets = lightkube_client.list(Secret, namespace=namespace)
-    assert len(list(secrets)) == 2
+    for name in TESTER2_SECRET_NAMES:
+        secret = lightkube_client.get(Secret, name, namespace=namespace)
+        assert secret != None

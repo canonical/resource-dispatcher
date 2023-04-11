@@ -207,7 +207,9 @@ class ResourceDispatcherOperator(CharmBase):
             all_files = self.container.list_files(push_location)
         except APIError as e:
             if "no such file or directory" in e.message:
-                self.logger.info(f"Subfolder does not exists creating {push_location}")
+                self.logger.info(
+                    f"Resource push location '{push_location}' does not exist - creating it"
+                )
                 all_files = []
             else:
                 raise e

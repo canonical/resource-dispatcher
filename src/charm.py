@@ -17,7 +17,7 @@ from lightkube.models.core_v1 import ServicePort
 from ops.charm import CharmBase, RelationBrokenEvent
 from ops.main import main
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus
-from ops.pebble import ChangeError, Layer
+from ops.pebble import APIError, ChangeError, Layer
 from serialized_data_interface import NoCompatibleVersions, NoVersionsListed, get_interfaces
 
 K8S_RESOURCE_FILES = ["src/templates/composite-controller.yaml.j2"]
@@ -203,7 +203,16 @@ class ResourceDispatcherOperator(CharmBase):
             manifests: List of kubernetes manifests to be pushed to pebble layer.
             push_location: Container location where the manifests should be pushed to.
         """
-        all_files = self.container.list_files(push_location)
+        try:
+            all_files = self.container.list_files(push_location)
+        except APIError as e:
+            if "no such file or directory" in e.message:
+                self.logger.info(
+                    f"Resource push location '{push_location}' does not exist - creating it"
+                )
+                all_files = []
+            else:
+                raise e
         if manifests:
             manifests_locations = [
                 f"{push_location}/{m['metadata']['name']}.yaml" for m in manifests
@@ -217,7 +226,9 @@ class ResourceDispatcherOperator(CharmBase):
         if manifests:
             for manifest in manifests:
                 filename = manifest["metadata"]["name"]
-                self.container.push(f"{push_location}/{filename}.yaml", yaml.dump(manifest))
+                self.container.push(
+                    f"{push_location}/{filename}.yaml", yaml.dump(manifest), make_dirs=True
+                )
 
     def _update_manifests(self, interfaces, dispatch_folder, relation, event):
         """Get manifests from relation and update them in dispatcher folder."""
@@ -247,6 +258,12 @@ class ResourceDispatcherOperator(CharmBase):
                 interfaces,
                 f"{DISPATCHER_RESOURCES_PATH}/service-accounts",
                 "service-accounts",
+                event,
+            )
+            self._update_manifests(
+                interfaces,
+                f"{DISPATCHER_RESOURCES_PATH}/pod-defaults",
+                "pod-defaults",
                 event,
             )
         except ErrorWithStatus as err:

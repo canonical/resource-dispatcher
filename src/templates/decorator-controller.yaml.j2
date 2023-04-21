@@ -1,0 +1,29 @@
+apiVersion: metacontroller.k8s.io/v1alpha1
+kind: DecoratorController
+metadata:
+  name: kubeflow-resource-dispatcher-controller
+spec:
+  resources:
+  - apiVersion: v1
+    resource: namespaces
+    labelSelector:
+      matchExpressions:
+      - {key: {{ label }}, operator: Exists}
+  attachments:
+  - apiVersion: v1
+    resource: secrets
+    updateStrategy:
+      method: InPlace
+  - apiVersion: v1
+    resource: serviceaccounts
+    updateStrategy:
+      method: InPlace
+  - apiVersion: kubeflow.org/v1alpha1
+    resource: poddefaults
+    updateStrategy:
+      method: InPlace
+  resyncPeriodSeconds: 10
+  hooks:
+    sync:
+      webhook:
+        url: "http://{{ app_name }}.{{ namespace }}:{{ port }}/sync"

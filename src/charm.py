@@ -20,7 +20,7 @@ from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingSta
 from ops.pebble import APIError, ChangeError, Layer
 from serialized_data_interface import NoCompatibleVersions, NoVersionsListed, get_interfaces
 
-K8S_RESOURCE_FILES = ["src/templates/composite-controller.yaml.j2"]
+K8S_RESOURCE_FILES = ["src/templates/decorator-controller.yaml.j2"]
 DISPATCHER_RESOURCES_PATH = "/app/resources"
 
 
@@ -39,7 +39,12 @@ class ResourceDispatcherOperator(CharmBase):
         self._container_name = "resource-dispatcher"
         self._container = self.unit.get_container(self._container_name)
 
-        self._context = {"app_name": self._name, "namespace": self._namespace, "port": self._port}
+        self._context = {
+            "app_name": self._name,
+            "namespace": self._namespace,
+            "port": self._port,
+            "label": self._namespace_label,
+        }
 
         self._k8s_resource_handler = None
 

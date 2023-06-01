@@ -1,4 +1,4 @@
-charmed-kubeflow-chisme==0.0.8
+charmed-kubeflow-chisme==0.0.10
 lightkube-models
 ops
 oci-image

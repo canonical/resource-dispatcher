@@ -182,7 +182,7 @@ mako==1.2.4
     # via alembic
 markdown==3.4.3
     # via mlflow
-markupsafe==2.1.2
+markupsafe==2.1.3
     # via
     #   -r requirements.txt
     #   jinja2

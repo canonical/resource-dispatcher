@@ -18,7 +18,7 @@ certifi==2023.5.7
     #   httpcore
     #   httpx
     #   requests
-charmed-kubeflow-chisme==0.0.10
+charmed-kubeflow-chisme==0.0.11
     # via -r requirements.txt
 charset-normalizer==3.1.0
     # via
@@ -102,7 +102,7 @@ pyrsistent==0.19.3
     # via
     #   -r requirements.txt
     #   jsonschema
-pytest==7.3.1
+pytest==7.3.2
     # via
     #   -r requirements-unit.in
     #   pytest-lazy-fixture
@@ -143,11 +143,11 @@ tenacity==8.2.2
     #   charmed-kubeflow-chisme
 tomli==2.0.1
     # via pytest
-urllib3==2.0.2
+urllib3==2.0.3
     # via
     #   -r requirements.txt
     #   requests
-websocket-client==1.5.2
+websocket-client==1.5.3
     # via
     #   -r requirements.txt
     #   ops

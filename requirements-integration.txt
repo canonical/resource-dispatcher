@@ -10,7 +10,7 @@ aiosignal==1.3.1
     # via aiohttp
 alembic==1.11.1
     # via mlflow
-anyio==3.7.0
+anyio==3.7.1
     # via
     #   -r requirements.txt
     #   httpcore
@@ -23,6 +23,7 @@ attrs==23.1.0
     #   -r requirements.txt
     #   aiohttp
     #   jsonschema
+    #   referencing
 backcall==0.2.0
     # via ipython
 bcrypt==4.0.1
@@ -44,19 +45,19 @@ cffi==1.15.1
     #   pynacl
 charmed-kubeflow-chisme==0.0.11
     # via -r requirements.txt
-charset-normalizer==3.1.0
+charset-normalizer==3.2.0
     # via
     #   -r requirements.txt
     #   aiohttp
     #   requests
-click==8.1.3
+click==8.1.4
     # via
     #   databricks-cli
     #   flask
     #   mlflow
 cloudpickle==2.2.1
     # via mlflow
-contourpy==1.0.7
+contourpy==1.1.0
     # via matplotlib
 cryptography==41.0.1
     # via paramiko
@@ -76,7 +77,7 @@ docker==6.1.3
     # via mlflow
 entrypoints==0.4
     # via mlflow
-exceptiongroup==1.1.1
+exceptiongroup==1.1.2
     # via
     #   -r requirements.txt
     #   anyio
@@ -85,7 +86,7 @@ executing==1.2.0
     # via stack-data
 flask==2.3.2
     # via mlflow
-fonttools==4.39.4
+fonttools==4.40.0
     # via matplotlib
 frozenlist==1.3.3
     # via
@@ -105,7 +106,7 @@ h11==0.14.0
     # via
     #   -r requirements.txt
     #   httpcore
-httpcore==0.17.2
+httpcore==0.17.3
     # via
     #   -r requirements.txt
     #   httpx
@@ -120,17 +121,18 @@ idna==3.4
     #   httpx
     #   requests
     #   yarl
-importlib-metadata==6.6.0
+importlib-metadata==6.8.0
     # via
     #   alembic
     #   flask
     #   markdown
     #   mlflow
-importlib-resources==5.12.0
+importlib-resources==6.0.0
     # via
     #   -r requirements.txt
     #   alembic
     #   jsonschema
+    #   jsonschema-specifications
     #   matplotlib
 iniconfig==2.0.0
     # via pytest
@@ -150,12 +152,16 @@ jinja2==3.1.2
     #   flask
     #   mlflow
     #   pytest-operator
-joblib==1.2.0
+joblib==1.3.1
     # via scikit-learn
-jsonschema==4.17.3
+jsonschema==4.18.0
     # via
     #   -r requirements.txt
     #   serialized-data-interface
+jsonschema-specifications==2023.6.1
+    # via
+    #   -r requirements.txt
+    #   jsonschema
 juju==3.0.4
     # via
     #   -r requirements-integration.in
@@ -188,7 +194,7 @@ markupsafe==2.1.3
     #   jinja2
     #   mako
     #   werkzeug
-matplotlib==3.7.1
+matplotlib==3.7.2
     # via mlflow
 matplotlib-inline==0.1.6
     # via ipython
@@ -200,7 +206,7 @@ multidict==6.0.4
     #   yarl
 mypy-extensions==1.0.0
     # via typing-inspect
-numpy==1.24.3
+numpy==1.24.4
     # via
     #   contourpy
     #   matplotlib
@@ -215,7 +221,7 @@ oauthlib==3.2.2
     #   requests-oauthlib
 oci-image==1.0.0
     # via -r requirements.txt
-ops==2.3.0
+ops==2.4.1
     # via
     #   -r requirements.txt
     #   charmed-kubeflow-chisme
@@ -230,7 +236,7 @@ packaging==23.1
     #   matplotlib
     #   mlflow
     #   pytest
-pandas==2.0.2
+pandas==2.0.3
     # via mlflow
 paramiko==2.12.0
     # via juju
@@ -240,15 +246,15 @@ pexpect==4.8.0
     # via ipython
 pickleshare==0.7.5
     # via ipython
-pillow==9.5.0
+pillow==10.0.0
     # via matplotlib
 pkgutil-resolve-name==1.3.10
     # via
     #   -r requirements.txt
     #   jsonschema
-pluggy==1.0.0
+pluggy==1.2.0
     # via pytest
-prompt-toolkit==3.0.38
+prompt-toolkit==3.0.39
     # via ipython
 protobuf==3.20.3
     # via
@@ -258,7 +264,7 @@ ptyprocess==0.7.0
     # via pexpect
 pure-eval==0.2.2
     # via stack-data
-pyarrow==12.0.0
+pyarrow==12.0.1
     # via mlflow
 pyasn1==0.5.0
     # via
@@ -286,17 +292,13 @@ pyrfc3339==1.1
     # via
     #   juju
     #   macaroonbakery
-pyrsistent==0.19.3
-    # via
-    #   -r requirements.txt
-    #   jsonschema
-pytest==7.3.2
+pytest==7.4.0
     # via
     #   pytest-asyncio
     #   pytest-operator
 pytest-asyncio==0.21.0
     # via pytest-operator
-pytest-operator==0.27.0
+pytest-operator==0.28.0
     # via -r requirements-integration.in
 python-dateutil==2.8.2
     # via
@@ -321,6 +323,11 @@ pyyaml==6.0
     #   serialized-data-interface
 querystring-parser==1.2.4
     # via mlflow
+referencing==0.29.1
+    # via
+    #   -r requirements.txt
+    #   jsonschema
+    #   jsonschema-specifications
 requests==2.31.0
     # via
     #   -r requirements-integration.in
@@ -335,9 +342,14 @@ requests==2.31.0
     #   theblues
 requests-oauthlib==1.3.1
     # via kubernetes
+rpds-py==0.8.10
+    # via
+    #   -r requirements.txt
+    #   jsonschema
+    #   referencing
 rsa==4.9
     # via google-auth
-ruamel-yaml==0.17.31
+ruamel-yaml==0.17.32
     # via
     #   -r requirements.txt
     #   charmed-kubeflow-chisme
@@ -345,7 +357,7 @@ ruamel-yaml-clib==0.2.7
     # via
     #   -r requirements.txt
     #   ruamel-yaml
-scikit-learn==1.2.2
+scikit-learn==1.3.0
     # via mlflow
 scipy==1.10.1
     # via
@@ -372,7 +384,7 @@ sniffio==1.3.0
     #   anyio
     #   httpcore
     #   httpx
-sqlalchemy==2.0.16
+sqlalchemy==2.0.18
     # via
     #   alembic
     #   mlflow
@@ -400,7 +412,7 @@ traitlets==5.9.0
     # via
     #   ipython
     #   matplotlib-inline
-typing-extensions==4.6.3
+typing-extensions==4.7.1
     # via
     #   alembic
     #   ipython
@@ -418,7 +430,7 @@ urllib3==2.0.3
     #   requests
 wcwidth==0.2.6
     # via prompt-toolkit
-websocket-client==1.5.3
+websocket-client==1.6.1
     # via
     #   -r requirements.txt
     #   docker
@@ -430,7 +442,7 @@ werkzeug==2.3.6
     # via flask
 yarl==1.9.2
     # via aiohttp
-zipp==3.15.0
+zipp==3.16.0
     # via
     #   -r requirements.txt
     #   importlib-metadata

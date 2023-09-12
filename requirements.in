@@ -1,5 +1,6 @@
-charmed-kubeflow-chisme>=0.0.10
+charmed-kubeflow-chisme
 lightkube-models
 ops
 oci-image
 serialized-data-interface
+pyyaml

@@ -61,6 +61,7 @@ pyrsistent==0.19.3
     # via jsonschema
 pyyaml==6.0.1
     # via
+    #   -r requirements.in
     #   lightkube
     #   ops
     #   serialized-data-interface

@@ -254,6 +254,7 @@ class ResourceDispatcherOperator(CharmBase):
         try:
             self._check_leader()
             self._check_container()
+            self._deploy_k8s_resources()
             interfaces = self._get_interfaces()
             self._update_layer()
             self._update_manifests(

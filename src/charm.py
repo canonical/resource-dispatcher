@@ -15,6 +15,7 @@ from lightkube import ApiError
 from lightkube.generic_resource import load_in_cluster_generic_resources
 from lightkube.models.core_v1 import ServicePort
 from ops.charm import CharmBase, RelationBrokenEvent
+from ops.framework import EventBase
 from ops.main import main
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus
 from ops.pebble import APIError, ChangeError, Layer
@@ -117,9 +118,10 @@ class ResourceDispatcherOperator(CharmBase):
             self.logger.info("Not a leader, skipping setup")
             raise ErrorWithStatus("Waiting for leadership", WaitingStatus)
 
-    def _check_container(self):
+    def _check_container(self, event: EventBase):
         """Check if we can connect the container."""
         if not self.container.can_connect():
+            event.defer()
             raise ErrorWithStatus("Container is not ready", WaitingStatus)
 
     def _deploy_k8s_resources(self) -> None:
@@ -253,8 +255,7 @@ class ResourceDispatcherOperator(CharmBase):
         """Perform all required actions for the Charm."""
         try:
             self._check_leader()
-            self._check_container()
-            self._deploy_k8s_resources()
+            self._check_container(event)
             interfaces = self._get_interfaces()
             self._update_layer()
             self._update_manifests(

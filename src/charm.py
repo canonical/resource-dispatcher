@@ -251,7 +251,7 @@ class ResourceDispatcherOperator(CharmBase):
         self.logger.debug(f"received {relation} are {manifests}")
         self._sync_manifests(manifests, dispatch_folder)
 
-    def _on_event(self, event) -> None:
+    def _on_event(self, event: EventBase) -> None:
         """Perform all required actions for the Charm."""
         try:
             self._check_leader()

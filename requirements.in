@@ -3,4 +3,4 @@ lightkube-models
 ops
 oci-image
 serialized-data-interface
-pyyaml==6.0.1
+pyyaml

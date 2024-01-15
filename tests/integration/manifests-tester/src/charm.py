@@ -9,14 +9,22 @@ import glob
 import json
 import logging
 from pathlib import Path
+from typing import List
 
 import yaml
+from charms.resource_dispatcher.v0.resource_dispatcher import (
+    KubernetesManifest,
+    KubernetesManifestsRequirer,
+)
 from ops.charm import CharmBase
 from ops.main import main
 from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
-from serialized_data_interface import NoCompatibleVersions, NoVersionsListed, get_interfaces
 
 logger = logging.getLogger(__name__)
+
+PODDEFAULTS_RELATION_NAME = "pod-defaults"
+SECRETS_RELATION_NAME = "secrets"
+SERVICEACCOUNTS_RELATION_NAME = "service-accounts"
 
 
 class ManifestsTesterCharm(CharmBase):
@@ -28,45 +36,43 @@ class ManifestsTesterCharm(CharmBase):
         self._manifests_folder = self.model.config["manifests_folder"]
 
         self.framework.observe(self.on.start, self._on_start)
-        self.framework.observe(self.on.config_changed, self._on_event)
 
-        for rel in self.model.relations.keys():
-            self.framework.observe(self.on[rel].relation_changed, self._on_event)
+        self._poddefaults_manifests_requirer = KubernetesManifestsRequirer(
+            charm=self,
+            relation_name=PODDEFAULTS_RELATION_NAME,
+            manifests=self._poddefaults_manifests,
+        )
+        self._secrets_manifests_requirer = KubernetesManifestsRequirer(
+            charm=self, relation_name=SECRETS_RELATION_NAME, manifests=self._secrets_manifests
+        )
+        self._service_accounts_manifests_requirer = KubernetesManifestsRequirer(
+            charm=self,
+            relation_name=SERVICEACCOUNTS_RELATION_NAME,
+            manifests=self._serviceaccounts_manifests,
+        )
+
+    @property
+    def _poddefaults_manifests(self):
+        return self._get_manifests(PODDEFAULTS_RELATION_NAME, self._manifests_folder)
+
+    @property
+    def _secrets_manifests(self):
+        return self._get_manifests(SECRETS_RELATION_NAME, self._manifests_folder)
+
+    @property
+    def _serviceaccounts_manifests(self):
+        return self._get_manifests(SERVICEACCOUNTS_RELATION_NAME, self._manifests_folder)
+
+    def _get_manifests(self, resource_type, folder) -> List[KubernetesManifest]:
+        manifests = []
+        manifest_files = glob.glob(f"{folder}/{resource_type}/*.yaml")
+        for file in manifest_files:
+            file_content = Path(file).read_text()
+            manifests.append(KubernetesManifest(file_content))
+        return manifests
 
     def _on_start(self, _):
         """Set active on start."""
-        self.model.unit.status = ActiveStatus()
-
-    def _get_interfaces(self):
-        """Retrieve interface object."""
-        try:
-            interfaces = get_interfaces(self)
-        except NoVersionsListed:
-            self.model.unit.status = WaitingStatus()
-            return {"secrets": None, "pod-defaults": None, "service-accounts": None}
-        except NoCompatibleVersions:
-            self.model.unit.status = BlockedStatus()
-            return {"secrets": None, "pod-defaults": None, "service-accounts": None}
-        return interfaces
-
-    def _send_manifests(self, interfaces, folder, relation):
-        """Send manifests from folder to desired relation."""
-        if relation in interfaces and interfaces[relation]:
-            manifests = []
-            logger.info(f"Scanning folder {folder}/{relation}")
-            manifest_files = glob.glob(f"{folder}/{relation}/*.yaml")
-            for file in manifest_files:
-                manifest = yaml.safe_load(Path(file).read_text())
-                manifests.append(manifest)
-            data = {relation: json.dumps(manifests)}
-            interfaces[relation].send_data(data)
-
-    def _on_event(self, _) -> None:
-        """Perform all required actions for the Charm."""
-        interfaces = self._get_interfaces()
-        self._send_manifests(interfaces, self._manifests_folder, "secrets")
-        self._send_manifests(interfaces, self._manifests_folder, "service-accounts")
-        self._send_manifests(interfaces, self._manifests_folder, "pod-defaults")
         self.model.unit.status = ActiveStatus()
 
 

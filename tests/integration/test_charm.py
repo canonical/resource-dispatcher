@@ -191,8 +191,8 @@ async def test_manifests_created_from_both_helpers(
 async def test_remove_relation(ops_test: OpsTest):
     """Make sure that charm goes to active state after relation is removed"""
     # There is no remove_relation method in opstest so calling it directly
-    subprocess.Popen(
-        ["juju", "remove-relation", f"{CHARM_NAME}:secrets", f"{MANIFEST_CHARM_NAME1}:secrets"]
+    await ops_test.juju(
+        "remove-relation", f"{CHARM_NAME}:secrets", f"{MANIFEST_CHARM_NAME1}:secrets"
     )
     await ops_test.model.wait_for_idle(
         apps=[CHARM_NAME, METACONTROLLER_CHARM_NAME, MANIFEST_CHARM_NAME1, MANIFEST_CHARM_NAME2],

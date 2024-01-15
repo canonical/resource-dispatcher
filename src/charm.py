@@ -3,7 +3,6 @@
 # See LICENSE file for licensing details.
 #
 
-import json
 import logging
 
 import yaml
@@ -11,18 +10,21 @@ from charmed_kubeflow_chisme.exceptions import ErrorWithStatus, GenericCharmRunt
 from charmed_kubeflow_chisme.kubernetes import KubernetesResourceHandler
 from charmed_kubeflow_chisme.lightkube.batch import delete_many
 from charms.observability_libs.v1.kubernetes_service_patch import KubernetesServicePatch
+from charms.resource_dispatcher.v0.resource_dispatcher import KubernetesManifestsProvider
 from lightkube import ApiError
 from lightkube.generic_resource import load_in_cluster_generic_resources
 from lightkube.models.core_v1 import ServicePort
-from ops.charm import CharmBase, RelationBrokenEvent
+from ops.charm import CharmBase
 from ops.framework import EventBase
 from ops.main import main
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus
 from ops.pebble import APIError, ChangeError, Layer
-from serialized_data_interface import NoCompatibleVersions, NoVersionsListed, get_interfaces
 
 K8S_RESOURCE_FILES = ["src/templates/decorator-controller.yaml.j2"]
 DISPATCHER_RESOURCES_PATH = "/app/resources"
+PODDEFAULTS_RELATION_NAME = "pod-defaults"
+SECRETS_RELATION_NAME = "secrets"
+SERVICEACCOUNTS_RELATION_NAME = "service-accounts"
 
 
 class ResourceDispatcherOperator(CharmBase):
@@ -66,6 +68,23 @@ class ResourceDispatcherOperator(CharmBase):
             service_name=f"{self.model.app.name}",
             refresh_event=self.on.config_changed,
         )
+
+        self._poddefaults_manifests_provider = KubernetesManifestsProvider(
+            charm=self, relation_name=PODDEFAULTS_RELATION_NAME
+        )
+        self._secrets_manifests_provider = KubernetesManifestsProvider(
+            charm=self, relation_name=SECRETS_RELATION_NAME
+        )
+        self._serviceaccounts_manifests_provider = KubernetesManifestsProvider(
+            charm=self, relation_name=SERVICEACCOUNTS_RELATION_NAME
+        )
+
+        for provider in [
+            self._poddefaults_manifests_provider,
+            self._secrets_manifests_provider,
+            self._serviceaccounts_manifests_provider,
+        ]:
+            self.framework.observe(provider.on.updated, self._on_event)
 
     @property
     def container(self):
@@ -140,16 +159,6 @@ class ResourceDispatcherOperator(CharmBase):
         # deploy K8S resources to speed up deployment
         self._deploy_k8s_resources()
 
-    def _get_interfaces(self):
-        """Retrieve interface object."""
-        try:
-            interfaces = get_interfaces(self)
-        except NoVersionsListed as err:
-            raise ErrorWithStatus(err, WaitingStatus)
-        except NoCompatibleVersions as err:
-            raise ErrorWithStatus(err, BlockedStatus)
-        return interfaces
-
     def _update_layer(self) -> None:
         """Update the Pebble configuration layer (if changed)."""
         current_layer = self.container.get_plan()
@@ -163,33 +172,12 @@ class ResourceDispatcherOperator(CharmBase):
             except ChangeError as err:
                 raise GenericCharmRuntimeError(f"Failed to replan with error: {str(err)}") from err
 
-    def _get_manifests(self, interfaces, relation, event):
+    def _get_manifests(self, manifests_provider):
         """Unpacks and returns the manifests relation data."""
-        if not ((relation_interface := interfaces[relation]) and relation_interface.get_data()):
-            self.logger.info(f"No {relation} data presented in relation")
-            return None
-        try:
-            relations_data = {
-                (rel, app): route
-                for (rel, app), route in sorted(
-                    relation_interface.get_data().items(), key=lambda tup: tup[0][0].id
-                )
-                if app != self.app
-            }
-        except Exception as e:
-            raise ErrorWithStatus(
-                f"Unexpected error unpacking {relation} data - data format not "
-                f"as expected. Caught exception: '{str(e)}'",
-                BlockedStatus,
-            )
-        if isinstance(event, (RelationBrokenEvent)):
-            if (event.relation, event.app) in relations_data:
-                del relations_data[(event.relation, event.app)]
 
         manifests = []
-        for relation_data in relations_data.values():
-            manifests += json.loads(relation_data[relation])
-        self.logger.debug(f"manifests are {manifests}")
+        manifests = manifests_provider.get_manifests()
+        self.logger.info(f"manifests are {manifests}")  # TODO: remove info log
         return manifests
 
     def _manifests_valid(self, manifests):
@@ -237,9 +225,9 @@ class ResourceDispatcherOperator(CharmBase):
                     f"{push_location}/{filename}.yaml", yaml.dump(manifest), make_dirs=True
                 )
 
-    def _update_manifests(self, interfaces, dispatch_folder, relation, event):
+    def _update_manifests(self, manifests_provider, dispatch_folder, relation):
         """Get manifests from relation and update them in dispatcher folder."""
-        manifests = self._get_manifests(interfaces, relation, event)
+        manifests = self._get_manifests(manifests_provider)
         if not self._manifests_valid(manifests):
             self.logger.debug(
                 f"Manifests names in all relations must be unique {','.join(manifests)}"
@@ -256,22 +244,21 @@ class ResourceDispatcherOperator(CharmBase):
         try:
             self._check_leader()
             self._check_container(event)
-            interfaces = self._get_interfaces()
             self._update_layer()
             self._update_manifests(
-                interfaces, f"{DISPATCHER_RESOURCES_PATH}/secrets", "secrets", event
+                self._secrets_manifests_provider,
+                f"{DISPATCHER_RESOURCES_PATH}/{SECRETS_RELATION_NAME}",
+                SECRETS_RELATION_NAME,
             )
             self._update_manifests(
-                interfaces,
-                f"{DISPATCHER_RESOURCES_PATH}/service-accounts",
-                "service-accounts",
-                event,
+                self._serviceaccounts_manifests_provider,
+                f"{DISPATCHER_RESOURCES_PATH}/{SERVICEACCOUNTS_RELATION_NAME}",
+                SERVICEACCOUNTS_RELATION_NAME,
             )
             self._update_manifests(
-                interfaces,
-                f"{DISPATCHER_RESOURCES_PATH}/pod-defaults",
-                "pod-defaults",
-                event,
+                self._poddefaults_manifests_provider,
+                f"{DISPATCHER_RESOURCES_PATH}/{PODDEFAULTS_RELATION_NAME}",
+                PODDEFAULTS_RELATION_NAME,
             )
         except ErrorWithStatus as err:
             self.model.unit.status = err.status

@@ -21,10 +21,10 @@ from charms.resource_dispatcher.v0.resource_dispatcher import KubernetesManifest
 # ...
 
 MANIFESTS = [
-    KubernetesManifests(
+    KubernetesManifest(
     Path(YAML_FILE_PATH).read_text()
     ),
-    KubernetesManifests(
+    KubernetesManifest(
     Path(OTHER_YAML_FILE_PATH).read_text()
     ),
 ]

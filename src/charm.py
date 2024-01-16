@@ -56,10 +56,6 @@ class ResourceDispatcherOperator(CharmBase):
         self.framework.observe(self.on.config_changed, self._on_event)
         self.framework.observe(self.on.remove, self._on_remove)
 
-        for rel in self.model.relations.keys():
-            self.framework.observe(self.on[rel].relation_changed, self._on_event)
-            self.framework.observe(self.on[rel].relation_broken, self._on_event)
-
         port = ServicePort(int(self._port), name=f"{self.app.name}")
         self.service_patcher = KubernetesServicePatch(
             self,

@@ -19,6 +19,24 @@ Then in your charm, do:
 ```python
 from charms.resource_dispatcher.v0.resource_dispatcher import KubernetesManifestsRequirer, KubernetesManifest
 # ...
+
+MANIFESTS = [
+    KubernetesManifests(
+    Path(YAML_FILE_PATH).read_text()
+    ),
+    KubernetesManifests(
+    Path(OTHER_YAML_FILE_PATH).read_text()
+    ),
+]
+
+class SomeCharm(CharmBase):
+  def __init__(self, *args):
+    # ...
+    self.manifests_requirer = KubernetesManifestsRequirer(
+            charm=self, relation_name=RELATION_NAME, manifests=MANIFESTS
+        )
+    # ...
+```
 """
 import json
 import logging
@@ -44,6 +62,7 @@ LIBPATCH = 1
 
 KUBERNETES_MANIFESTS_FIELD = "kubernetes_manifests"
 
+
 @dataclass
 class KubernetesManifest:
     """
@@ -60,18 +79,23 @@ class KubernetesManifest:
         try:
             yaml.safe_load(self.manifest_content)
         except yaml.YAMLError as e:
-            raise Exception(f"Invalid yaml error: {e}, unable to parse this content to yaml\n: {self.manifest_content}")
+            raise Exception(
+                f"Invalid yaml error: {e}, unable to parse this content to yaml\n: {self.manifest_content}"
+            )
 
     def get_manifest_yaml(self):
         return yaml.safe_load(self.manifest_content)
 
+
 class KubernetesManifestsUpdatedEvent(RelationEvent):
     """Indicates the Kubernetes Objects data was updated."""
+
 
 class KubernetesManifestsEvents(ObjectEvents):
     """Events for the Resource Dispatcher library."""
 
     updated = EventSource(KubernetesManifestsUpdatedEvent)
+
 
 class KubernetesManifestsProvider(Object):
     """Relation manager for the Provider side of the Resource Dispatcher relations."""
@@ -136,7 +160,7 @@ class KubernetesManifestsProvider(Object):
                 f"exclude {self._relation_name} manifests from other app named '{other_app_to_skip}'.  "
             )
 
-        manifests=[]
+        manifests = []
 
         kubernetes_manifests_relations = self.model.relations[self._relation_name]
 
@@ -147,7 +171,9 @@ class KubernetesManifestsProvider(Object):
                 continue
             json_data = relation.data[other_app].get(KUBERNETES_MANIFESTS_FIELD, "{}")
             dict_data = json.loads(json_data)
-            manifests.extend([KubernetesManifest(**item).get_manifest_yaml() for item in dict_data])
+            manifests.extend(
+                [KubernetesManifest(**item).get_manifest_yaml() for item in dict_data]
+            )
 
         return manifests
 
@@ -158,6 +184,7 @@ class KubernetesManifestsProvider(Object):
     def _on_relation_broken(self, event: BoundEvent):
         """Handler for relation-broken event for this relation."""
         self.on.updated.emit(event.relation)
+
 
 class KubernetesManifestsRequirer(Object):
     """Relation manager for the Requirer side of the Resource Dispatcher relation."""
@@ -223,7 +250,6 @@ class KubernetesManifestsRequirer(Object):
             relation_data = relation.data[self._charm.app]
             manifests_as_json = json.dumps([asdict(item) for item in self._manifests])
             relation_data.update({KUBERNETES_MANIFESTS_FIELD: manifests_as_json})
-
 
 
 def get_name_of_breaking_app(relation_name: str) -> Optional[str]:

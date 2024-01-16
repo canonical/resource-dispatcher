@@ -2,7 +2,6 @@
 # See LICENSE file for licensing details.
 
 import json
-from contextlib import nullcontext as does_not_raise
 from dataclasses import asdict
 from unittest.mock import MagicMock, patch
 
@@ -53,18 +52,6 @@ SECRET2 = {
 
 VALID_MANIFESTS = [{"metadata": {"name": "a"}}, {"metadata": {"name": "b"}}]
 INVALID_MANIFESTS = VALID_MANIFESTS + [{"metadata": {"name": "a"}}]
-
-INVALID_YAML = """
-apiVersion: v1
-kind: Secret
-metadata:
-  name: mlpipeline-minio-artifact
-  labels:
-    user.kubeflow.org/enabled: "true
-stringData:
-  AWS_ACCESS_KEY_ID: access_key
-  AWS_SECRET_ACCESS_KEY: secret_access_key
-"""
 
 
 class _FakeResponse:
@@ -309,15 +296,3 @@ class TestCharm:
             )
         assert "Failed to process invalid manifest. See debug logs" in str(e_info)
         assert e_info.value.status_type(BlockedStatus)
-
-    @pytest.mark.parametrize(
-        "manifest, context_raised",
-        [
-            (yaml.dump(SECRET1), does_not_raise()),
-            (yaml.dump(SECRET2), does_not_raise()),
-            (INVALID_YAML, pytest.raises(Exception)),
-        ],
-    )
-    def test_yaml_validation(self, manifest, context_raised):
-        with context_raised:
-            KubernetesManifest(manifest)

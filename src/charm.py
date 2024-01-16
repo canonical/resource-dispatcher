@@ -177,7 +177,7 @@ class ResourceDispatcherOperator(CharmBase):
 
         manifests = []
         manifests = manifests_provider.get_manifests()
-        self.logger.info(f"manifests are {manifests}")  # TODO: remove info log
+        self.logger.debug(f"manifests are {manifests}")
         return manifests
 
     def _manifests_valid(self, manifests):

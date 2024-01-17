@@ -112,7 +112,9 @@ def add_secret_relation_to_harness(harness: Harness) -> Harness:
         KubernetesManifest(yaml.dump(SECRET1)),
         KubernetesManifest(yaml.dump(SECRET2)),
     ]
-    databag = {KUBERNETES_MANIFESTS_FIELD: json.dumps([asdict(item) for item in secret_manifests])}
+    databag = {
+        KUBERNETES_MANIFESTS_FIELD: json.dumps([item.get_manifest() for item in secret_manifests])
+    }
     secret_relation_id = harness.add_relation("secrets", "mlflow-server")
     harness.add_relation_unit(secret_relation_id, "mlflow-server/0")
     harness.update_relation_data(secret_relation_id, "mlflow-server", databag)
@@ -277,7 +279,7 @@ class TestCharm:
     ):
         get_manifests.return_value = ""
         harness.begin()
-        harness.charm._update_manifests(harness.charm._secrets_manifests_provider, "", "secrets")
+        harness.charm._update_manifests(harness.charm._secrets_manifests_provider, "")
         sync_manifests.assert_called_with("", "")
 
     @patch(
@@ -298,51 +300,6 @@ class TestCharm:
         get_manifests.return_value = ""
         harness.begin()
         with pytest.raises(ErrorWithStatus) as e_info:
-            harness.charm._update_manifests(
-                harness.charm._secrets_manifests_provider, "", "secrets"
-            )
+            harness.charm._update_manifests(harness.charm._secrets_manifests_provider, "")
         assert "Failed to process invalid manifest. See debug logs" in str(e_info)
         assert e_info.value.status_type(BlockedStatus)
-
-    @patch(
-        "charm.KubernetesServicePatch",
-        lambda x, y, service_name, service_type, refresh_event: None,
-    )
-    def test_on_updated_event_reconciler_called_once(
-        self,
-        harness: Harness,
-    ):
-        # Add secrets relation with data
-        secret_manifests = [
-            KubernetesManifest(yaml.dump(SECRET1)),
-            KubernetesManifest(yaml.dump(SECRET2)),
-        ]
-        secrets_databag = {
-            KUBERNETES_MANIFESTS_FIELD: json.dumps([asdict(item) for item in secret_manifests])
-        }
-        secret_relation_id = harness.add_relation("secrets", "mlflow-server")
-        harness.add_relation_unit(secret_relation_id, "mlflow-server/0")
-        harness.update_relation_data(secret_relation_id, "mlflow-server", secrets_databag)
-
-        # Add service-accounts relation with data
-        serviceaccount_manifests = [KubernetesManifest(yaml.dump(SERVICEACCOUNT))]
-        serviceaccounts_databag = {
-            KUBERNETES_MANIFESTS_FIELD: json.dumps(
-                [asdict(item) for item in serviceaccount_manifests]
-            )
-        }
-        serviceaccounts_relation_id = harness.add_relation("service-accounts", "mlflow-server")
-        harness.add_relation_unit(serviceaccounts_relation_id, "mlflow-server/0")
-        harness.update_relation_data(
-            serviceaccounts_relation_id, "mlflow-server", serviceaccounts_databag
-        )
-
-        secrets_relation = harness.model.get_relation("secrets", secret_relation_id)
-
-        # Emit the secrets updated event and
-        # assert that the charm reconciler was called only once
-        harness.set_leader(True)
-        harness.begin()
-        harness.charm._on_event = MagicMock()
-        harness.charm._secrets_manifests_provider.on.updated.emit(secrets_relation)
-        harness.charm._on_event.assert_called_once()

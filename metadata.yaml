@@ -17,8 +17,8 @@ resources:
     upstream-source: charmedkubeflow/resource-dispatcher:1.0-22.04
 requires:
   secrets:
-    interface: resource_dispatcher
+    interface: kubernetes_manifest
   service-accounts:
-    interface: resource_dispatcher
+    interface: kubernetes_manifest
   pod-defaults:
-    interface: resource_dispatcher
+    interface: kubernetes_manifest

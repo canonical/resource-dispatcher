@@ -33,7 +33,7 @@ class SomeCharm(CharmBase):
   def __init__(self, *args):
     # ...
     self.manifests_requirer = KubernetesManifestsRequirer(
-            charm=self, relation_name=RELATION_NAME, manifests=MANIFESTS
+            charm=self, relation_name=RELATION_NAME, manifests_items=MANIFESTS
         )
     # ...
 ```
@@ -76,14 +76,9 @@ class KubernetesManifest:
 
     def __post_init__(self):
         """Validate that the manifest content is a valid YAML."""
-        try:
-            yaml.safe_load(self.manifest_content)
-        except yaml.YAMLError as e:
-            raise Exception(
-                f"Invalid yaml error: {e}, unable to parse this content to yaml\n: {self.manifest_content}"
-            )
+        yaml.safe_load(self.manifest_content)
 
-    def get_manifest_yaml(self):
+    def get_manifest(self):
         return yaml.safe_load(self.manifest_content)
 
 
@@ -144,7 +139,7 @@ class KubernetesManifestsProvider(Object):
             for evt in refresh_event:
                 self.framework.observe(evt, self._on_relation_changed)
 
-    def get_manifests(self) -> List[KubernetesManifest]:
+    def get_manifests(self) -> List[dict]:
         """
         Returns a list of all Kubernetes manifests sent in a relation.
 
@@ -169,11 +164,8 @@ class KubernetesManifestsProvider(Object):
             if other_app.name == other_app_to_skip:
                 # Skip this app because it is leaving a broken relation
                 continue
-            json_data = relation.data[other_app].get(KUBERNETES_MANIFESTS_FIELD, "{}")
-            dict_data = json.loads(json_data)
-            manifests.extend(
-                [KubernetesManifest(**item).get_manifest_yaml() for item in dict_data]
-            )
+            json_data = relation.data[other_app].get(KUBERNETES_MANIFESTS_FIELD, "[]")
+            manifests.extend(json.loads(json_data))
 
         return manifests
 
@@ -193,7 +185,7 @@ class KubernetesManifestsRequirer(Object):
         self,
         charm: CharmBase,
         relation_name: str,
-        manifests: List[KubernetesManifest],
+        manifests_items: List[KubernetesManifest],
         refresh_event: Optional[Union[BoundEvent, List[BoundEvent]]] = None,
     ):
         """
@@ -219,7 +211,7 @@ class KubernetesManifestsRequirer(Object):
         super().__init__(charm, relation_name)
         self._charm = charm
         self._relation_name = relation_name
-        self._manifests = manifests
+        self._manifests_items = manifests_items
 
         self.framework.observe(self._charm.on.leader_elected, self._on_send_data)
 
@@ -234,6 +226,12 @@ class KubernetesManifestsRequirer(Object):
 
             for evt in refresh_event:
                 self.framework.observe(evt, self._on_send_data)
+    
+    @property
+    def _manifests(self):
+        return [
+            item.get_manifest() for item in self._manifests_items
+        ]
 
     def _on_send_data(self, event: EventBase):
         """Handles any event where we should send data to the relation."""
@@ -248,7 +246,7 @@ class KubernetesManifestsRequirer(Object):
 
         for relation in relations:
             relation_data = relation.data[self._charm.app]
-            manifests_as_json = json.dumps([asdict(item) for item in self._manifests])
+            manifests_as_json = json.dumps(self._manifests)
             relation_data.update({KUBERNETES_MANIFESTS_FIELD: manifests_as_json})
 
 

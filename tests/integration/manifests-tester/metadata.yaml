@@ -7,8 +7,8 @@ description: |
   Charm for sending manifests to ResourceDispatcher relations.
 provides:
   secrets:
-    interface: resource_dispatcher
+    interface: kubernetes_manifest
   service-accounts:
-    interface: resource_dispatcher
+    interface: kubernetes_manifest
   pod-defaults:
-    interface: resource_dispatcher
+    interface: kubernetes_manifest

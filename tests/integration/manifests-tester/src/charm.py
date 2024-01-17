@@ -40,15 +40,17 @@ class ManifestsTesterCharm(CharmBase):
         self._poddefaults_manifests_requirer = KubernetesManifestsRequirer(
             charm=self,
             relation_name=PODDEFAULTS_RELATION_NAME,
-            manifests=self._poddefaults_manifests,
+            manifests_items=self._poddefaults_manifests,
         )
         self._secrets_manifests_requirer = KubernetesManifestsRequirer(
-            charm=self, relation_name=SECRETS_RELATION_NAME, manifests=self._secrets_manifests
+            charm=self,
+            relation_name=SECRETS_RELATION_NAME,
+            manifests_items=self._secrets_manifests,
         )
         self._service_accounts_manifests_requirer = KubernetesManifestsRequirer(
             charm=self,
             relation_name=SERVICEACCOUNTS_RELATION_NAME,
-            manifests=self._serviceaccounts_manifests,
+            manifests_items=self._serviceaccounts_manifests,
         )
 
     @property

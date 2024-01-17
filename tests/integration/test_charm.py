@@ -3,6 +3,7 @@
 
 import base64
 import logging
+import shutil
 import subprocess
 import time
 from pathlib import Path
@@ -25,6 +26,7 @@ logger = logging.getLogger(__name__)
 CHARM_NAME = "resource-dispatcher"
 MANIFEST_CHARM_NAME1 = "manifests-tester1"
 MANIFEST_CHARM_NAME2 = "manifests-tester2"
+MANIFESTS_REQUIRER_TESTER_CHARM = Path("tests/integration/manifests-tester").absolute()
 METACONTROLLER_CHARM_NAME = "metacontroller-operator"
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 NAMESPACE_FILE = "./tests/integration/namespace.yaml"
@@ -37,6 +39,14 @@ TESTER2_SECRET_NAMES = ["mlpipeline-minio-artifact2", "seldon-rclone-secret2"]
 PODDEFAULTS_NAMES = ["access-minio", "mlflow-server-minio"]
 
 PodDefault = create_namespaced_resource("kubeflow.org", "v1alpha1", "PodDefault", "poddefaults")
+
+
+@pytest.fixture(scope="module")
+def copy_libraries_into_tester_charm() -> None:
+    """Ensure that the tester charms use the current libraries."""
+    lib = Path("lib/charms/resource_dispatcher/v0/resource_dispatcher.py")
+    Path(MANIFESTS_REQUIRER_TESTER_CHARM, lib.parent).mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(lib.as_posix(), (MANIFESTS_REQUIRER_TESTER_CHARM / lib).as_posix())
 
 
 def _safe_load_file_to_text(filename: str) -> str:
@@ -127,7 +137,7 @@ async def test_build_and_deploy_dispatcher_charm(ops_test: OpsTest):
 
 
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy_helper_charms(ops_test: OpsTest):
+async def test_build_and_deploy_helper_charms(ops_test: OpsTest, copy_libraries_into_tester_charm):
     build_manifests_charm_path = await ops_test.build_charm("./tests/integration/manifests-tester")
     await ops_test.model.deploy(
         entity_url=build_manifests_charm_path,

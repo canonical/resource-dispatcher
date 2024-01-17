@@ -109,7 +109,7 @@ class DummyRequirerCharm(CharmBase):
         self.manifests_requirer = KubernetesManifestsRequirer(
             charm=self,
             relation_name=RELATION_NAME,
-            manifests=RELATION1_MANIFESTS,
+            manifests_items=RELATION1_MANIFESTS,
         )
 
 
@@ -119,7 +119,7 @@ class TestKubernetesManifest:
         [
             (yaml.dump(MANIFEST_CONTENT1), does_not_raise()),
             (yaml.dump(MANIFEST_CONTENT2), does_not_raise()),
-            (INVALID_YAML, pytest.raises(Exception)),
+            (INVALID_YAML, pytest.raises(yaml.YAMLError)),
         ],
     )
     def test_yaml_validation(self, manifest, context_raised):
@@ -138,27 +138,21 @@ class TestManifestsProvder:
         # Create data
         databag = {
             KUBERNETES_MANIFESTS_FIELD: json.dumps(
-                [asdict(manifest_item) for manifest_item in RELATION1_MANIFESTS]
+                [manifest_item.get_manifest() for manifest_item in RELATION1_MANIFESTS]
             )
         }
 
         other_databag = {
             KUBERNETES_MANIFESTS_FIELD: json.dumps(
-                [asdict(manifest_item) for manifest_item in RELATION2_MANIFESTS]
+                [manifest_item.get_manifest() for manifest_item in RELATION2_MANIFESTS]
             )
         }
 
         # Add data to relation
-        relation_id = harness.add_relation(RELATION_NAME, other_app)
-        harness.update_relation_data(
-            relation_id=relation_id, app_or_unit=other_app, key_values=databag
-        )
+        harness.add_relation(RELATION_NAME, other_app, app_data=databag)
 
         # Add to a second relation so we simulate having two relations of data
-        relation_id = harness.add_relation(RELATION_NAME, other_app)
-        harness.update_relation_data(
-            relation_id=relation_id, app_or_unit=other_app, key_values=other_databag
-        )
+        harness.add_relation(RELATION_NAME, other_app, app_data=other_databag)
 
         expected_manifests = [
             yaml.safe_load(content)
@@ -252,7 +246,7 @@ class TestManifestsRequirer:
         # Assert
         actual_manifests = get_manifests_from_relation(harness, relation_id, harness.model.app)
 
-        assert actual_manifests == RELATION1_MANIFESTS
+        assert actual_manifests == [item.get_manifest() for item in RELATION1_MANIFESTS]
 
     def test_send_manifests_on_relation_created(self):
         """Test that the Requirer correctly handles the relation created event."""
@@ -268,7 +262,7 @@ class TestManifestsRequirer:
         # Assert
         actual_manifests = get_manifests_from_relation(harness, relation_id, harness.model.app)
 
-        assert actual_manifests == RELATION1_MANIFESTS
+        assert actual_manifests == [item.get_manifest() for item in RELATION1_MANIFESTS]
 
     def test_send_manifests_without_leadership(self):
         """Tests whether library incorrectly sends manifests data when unit is not leader."""
@@ -294,6 +288,5 @@ class TestManifestsRequirer:
 def get_manifests_from_relation(harness, relation_id, this_app) -> List[KubernetesManifest]:
     """Returns the list of KubernetesManifests from a service-account relation on a harness."""
     raw_relation_data = harness.get_relation_data(relation_id=relation_id, app_or_unit=this_app)
-    relation_data_as_dicts = json.loads(raw_relation_data[KUBERNETES_MANIFESTS_FIELD])
-    actual_manifests = [KubernetesManifest(**data) for data in relation_data_as_dicts]
+    actual_manifests = json.loads(raw_relation_data[KUBERNETES_MANIFESTS_FIELD])
     return actual_manifests

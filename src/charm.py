@@ -221,7 +221,7 @@ class ResourceDispatcherOperator(CharmBase):
                     f"{push_location}/{filename}.yaml", yaml.dump(manifest), make_dirs=True
                 )
 
-    def _update_manifests(self, manifests_provider, dispatch_folder, relation):
+    def _update_manifests(self, manifests_provider, dispatch_folder):
         """Get manifests from relation and update them in dispatcher folder."""
         manifests = self._get_manifests(manifests_provider)
         if not self._manifests_valid(manifests):
@@ -232,7 +232,7 @@ class ResourceDispatcherOperator(CharmBase):
                 "Failed to process invalid manifest. See debug logs.",
                 BlockedStatus,
             )
-        self.logger.debug(f"received {relation} are {manifests}")
+        self.logger.debug(f"received {manifests_provider._relation_name} are {manifests}")
         self._sync_manifests(manifests, dispatch_folder)
 
     def _on_event(self, event: EventBase) -> None:
@@ -244,17 +244,14 @@ class ResourceDispatcherOperator(CharmBase):
             self._update_manifests(
                 self._secrets_manifests_provider,
                 f"{DISPATCHER_RESOURCES_PATH}/{SECRETS_RELATION_NAME}",
-                SECRETS_RELATION_NAME,
             )
             self._update_manifests(
                 self._serviceaccounts_manifests_provider,
                 f"{DISPATCHER_RESOURCES_PATH}/{SERVICEACCOUNTS_RELATION_NAME}",
-                SERVICEACCOUNTS_RELATION_NAME,
             )
             self._update_manifests(
                 self._poddefaults_manifests_provider,
                 f"{DISPATCHER_RESOURCES_PATH}/{PODDEFAULTS_RELATION_NAME}",
-                PODDEFAULTS_RELATION_NAME,
             )
         except ErrorWithStatus as err:
             self.model.unit.status = err.status

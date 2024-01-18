@@ -172,10 +172,7 @@ class KubernetesManifestsProvider(Object):
 
     def get_manifests(self) -> List[dict]:
         """
-        Returns a list of all Kubernetes manifests sent in a relation.
-
-        Returns:
-            List of KubernetesManifests sent in the data of relation relation_name.
+        Returns a list of dictionaries sent in the data of relation relation_name.
         """
 
         other_app_to_skip = get_name_of_breaking_app(relation_name=self._relation_name)

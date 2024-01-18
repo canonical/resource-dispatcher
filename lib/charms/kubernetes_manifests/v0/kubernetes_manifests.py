@@ -304,6 +304,16 @@ def get_name_of_breaking_app(relation_name: str) -> Optional[str]:
     If the application name is available, returns the name as a string;
     otherwise None.
     """
+    # In the case of a relation-broken event, Juju non-deterministically may or may not include 
+    # the breaking remote app's data in the relation data bag.  If this data is still in the data 
+    # bag, the `JUJU_REMOTE_APP` name will always be set.  For these cases, we return the 
+    # remote app name so the caller can remove that app from the data bag before using it.
+    #
+    # To catch these cases, we inspect the following environment variables managed by Juju: 
+    #   JUJU_REMOTE_APP: the name of the app we are interacting with on this relation event
+    #   JUJU_RELATION: the name of the relation we are interacting with on this relation event
+    #   JUJU_HOOK_NAME: the name of the relation event, such as RELATION_NAME-relation-broken
+    # See https://juju.is/docs/sdk/charm-environment-variables for more detail on these variables.
     if not os.environ.get("JUJU_REMOTE_APP", None):
         # No remote app is defined
         return None
@@ -313,5 +323,3 @@ def get_name_of_breaking_app(relation_name: str) -> Optional[str]:
     if not os.environ.get("JUJU_HOOK_NAME", None) == f"{relation_name}-relation-broken":
         # Not the relation-broken event
         return None
-
-    return os.environ.get("JUJU_REMOTE_APP", None)

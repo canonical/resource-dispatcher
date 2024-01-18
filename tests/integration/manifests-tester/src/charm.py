@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import List
 
 import yaml
-from charms.resource_dispatcher.v0.resource_dispatcher import (
+from charms.kubernetes_manifests.v0.kubernetes_manifests import (
     KubernetesManifest,
     KubernetesManifestRequirerWrapper,
     KubernetesManifestsRequirer,

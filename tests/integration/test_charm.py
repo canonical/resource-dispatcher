@@ -47,7 +47,7 @@ PodDefault = create_namespaced_resource("kubeflow.org", "v1alpha1", "PodDefault"
 @pytest.fixture(scope="module")
 def copy_libraries_into_tester_charm() -> None:
     """Ensure that the tester charms use the current libraries."""
-    lib = Path("lib/charms/resource_dispatcher/v0/resource_dispatcher.py")
+    lib = Path("lib/charms/kubernetes_manifests/v0/kubernetes_manifests.py")
     Path(MANIFESTS_REQUIRER_TESTER_CHARM, lib.parent).mkdir(parents=True, exist_ok=True)
     shutil.copyfile(lib.as_posix(), (MANIFESTS_REQUIRER_TESTER_CHARM / lib).as_posix())
 

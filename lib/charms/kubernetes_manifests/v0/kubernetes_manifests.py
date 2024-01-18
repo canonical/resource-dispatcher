@@ -323,3 +323,5 @@ def get_name_of_breaking_app(relation_name: str) -> Optional[str]:
     if not os.environ.get("JUJU_HOOK_NAME", None) == f"{relation_name}-relation-broken":
         # Not the relation-broken event
         return None
+    
+    return os.environ.get("JUJU_REMOTE_APP", None)

@@ -134,6 +134,7 @@ class DummyRequirerCharm(CharmBase):
             charm=self,
             relation_name=SERVICE_ACCOUNTS_RELATION,
             manifests_items=RELATION1_MANIFESTS,
+            refresh_event=[self.on[SERVICE_ACCOUNTS_RELATION].relation_joined],
         )
 
 
@@ -306,6 +307,28 @@ class TestManifestsRequirer:
         relation_id = harness.add_relation(
             relation_name=SERVICE_ACCOUNTS_RELATION, remote_app=other_app
         )
+
+        # Assert
+        actual_manifests = get_manifests_from_relation(harness, relation_id, harness.model.app)
+
+        assert actual_manifests == [item.manifest for item in RELATION1_MANIFESTS]
+
+    def test_send_manifests_on_refresh_event(self):
+        """Test that the Requirer correctly handles the event set in refresh_event."""
+        # Arrange
+        other_app = "provider"
+        harness = Harness(DummyRequirerCharm, meta=DUMMY_REQUIRER_METADATA)
+        harness.set_leader(True)
+        relation_id = harness.add_relation(
+            relation_name=SERVICE_ACCOUNTS_RELATION, remote_app=other_app
+        )
+
+        # Act
+        harness.begin()
+        relation = harness.charm.framework.model.get_relation(
+            SERVICE_ACCOUNTS_RELATION, relation_id
+        )
+        harness.charm.on[SERVICE_ACCOUNTS_RELATION].relation_joined.emit(relation)
 
         # Assert
         actual_manifests = get_manifests_from_relation(harness, relation_id, harness.model.app)

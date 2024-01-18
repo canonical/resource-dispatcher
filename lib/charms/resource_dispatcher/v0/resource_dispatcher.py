@@ -233,7 +233,7 @@ class KubernetesManifestsRequirer(Object):
         Args:
             charm: Charm this relation is being used by
             relation_name: Name of this relation (from metadata.yaml)
-            manifests: List of KubernetesManifest objects to send over the relation
+            manifests_items: List of KubernetesManifest objects to send over the relation
             refresh_event: List of BoundEvents that this manager should handle.  Use this to update
                            the data sent on this relation on demand.
         """
@@ -243,10 +243,10 @@ class KubernetesManifestsRequirer(Object):
         self._manifests_items = manifests_items
         self._requirer_wrapper = KubernetesManifestRequirerWrapper(self._charm, self._relation_name)
 
-        self.framework.observe(self._charm.on.leader_elected, self._on_send_data)
+        self.framework.observe(self._charm.on.leader_elected, self._send_data)
 
         self.framework.observe(
-            self._charm.on[self._relation_name].relation_created, self._on_send_data
+            self._charm.on[self._relation_name].relation_created, self._send_data
         )
 
         # apply user defined events
@@ -255,9 +255,9 @@ class KubernetesManifestsRequirer(Object):
                 refresh_event = [refresh_event]
 
             for evt in refresh_event:
-                self.framework.observe(evt, self._on_send_data)
+                self.framework.observe(evt, self._send_data)
 
-    def _on_send_data(self, event: EventBase):
+    def _send_data(self, event: EventBase):
         """Handles any event where we should send data to the relation."""
         self._requirer_wrapper.send_data(self._manifests_items)
 
@@ -300,11 +300,11 @@ class KubernetesManifestRequirerWrapper(Object):
 
 
 def get_name_of_breaking_app(relation_name: str) -> Optional[str]:
-    """Returns breaking app name if called during RELATION_NAME-relation-broken and the breaking app name is available.  # noqa
-
-    Else, returns None.
-
-    Relation type and app name are inferred from juju environment variables.
+    """
+    Get the name of a remote application that is leaving the relation during a relation broken event by
+    checking Juju environment variables.
+    If the application name is available, returns the name as a string;
+    otherwise None.
     """
     if not os.environ.get("JUJU_REMOTE_APP", None):
         # No remote app is defined

@@ -2,8 +2,8 @@
 
 This library implements data transfer for interfaces used by Resource Dispatcher
 to deploy resources to Kubeflow user namespaces. This library can be used
-for relations where Resource Dispatcher is the requirer, and a Kubernetes Resource
-is sent by the provider in the relation databag, to apply it to Kubeflow user namespaces.
+for relations where Resource Dispatcher is the provider, and a Kubernetes Resource
+is sent by the requirer in the relation databag, to apply it to Kubeflow user namespaces.
 
 ## Getting Started
 
@@ -14,7 +14,12 @@ cd some-charm
 charmcraft fetch-lib charms.resource_dispatcher.v0.resource_dispatcher
 ```
 
-Then in your charm, do:
+In your charm, the library can be used in two ways depending on whether the manifests
+being sent by the charm are static (available when the charm starts up),
+or dynamic (for example a manifest template that gets rendered with data from a relation)
+
+If the manifests are static, instantiate the KubernetesManifestsRequirer.
+In your charm do:
 
 ```python
 from charms.resource_dispatcher.v0.resource_dispatcher import KubernetesManifestsRequirer, KubernetesManifest
@@ -32,16 +37,44 @@ MANIFESTS = [
 class SomeCharm(CharmBase):
   def __init__(self, *args):
     # ...
-    self.manifests_requirer = KubernetesManifestsRequirer(
-            charm=self, relation_name=RELATION_NAME, manifests_items=MANIFESTS
+    self.secrets_manifests_requirer = KubernetesManifestsRequirer(
+            charm=self, relation_name="secrets", manifests_items=SECRETS_MANIFESTS
+        )
+    self.service_accounts_requirer = KubernetesManifestsRequirer(
+            charm=self, relation_name="service-accounts", manifests_items=SA_MANIFESTS
         )
     # ...
+```
+
+If the manifests are dynamic, instantiate the KubernetesManifestsRequirerWrapper.
+In your charm do:
+
+```python
+class SomeCharm(CharmBase):
+    def __init__(self, *args):
+        # ...
+        self._secrets_manifests_wrapper = KubernetesManifestsRequirerWrapper(
+            charm = self,
+            relation_name = "secrets"
+        )
+
+        self.framework.observe(self.on.leader_elected, self._send_secret)
+        self.framework.observe(self.on["secrets"].relation_created, self._send_secret)
+        # observe all the other events for when the manifests change
+
+    def _send_secret(self, _):
+        #...
+        Write the logic to re-calculate the manifests
+        rendered_manifests = ...
+        #...
+        manifest_items = [KubernetesManifest(rendered_manifests)]
+        self.secrets_requirer.send_data(manifest_items)
 ```
 """
 import json
 import logging
 import os
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass, field
 from typing import List, Optional, Union
 
 import yaml
@@ -73,13 +106,11 @@ class KubernetesManifest:
     """
 
     manifest_content: str
+    manifest: dict = field(init=False)
 
     def __post_init__(self):
         """Validate that the manifest content is a valid YAML."""
-        yaml.safe_load(self.manifest_content)
-
-    def get_manifest(self):
-        return yaml.safe_load(self.manifest_content)
+        self. manifest = yaml.safe_load(self.manifest_content)
 
 
 class KubernetesManifestsUpdatedEvent(RelationEvent):
@@ -157,7 +188,7 @@ class KubernetesManifestsProvider(Object):
 
         manifests = []
 
-        kubernetes_manifests_relations = self.model.relations[self._relation_name]
+        kubernetes_manifests_relations = self._charm.model.relations[self._relation_name]
 
         for relation in kubernetes_manifests_relations:
             other_app = relation.app
@@ -168,6 +199,7 @@ class KubernetesManifestsProvider(Object):
             manifests.extend(json.loads(json_data))
 
         return manifests
+
 
     def _on_relation_changed(self, event):
         """Handler for relation-changed event for this relation."""
@@ -212,6 +244,7 @@ class KubernetesManifestsRequirer(Object):
         self._charm = charm
         self._relation_name = relation_name
         self._manifests_items = manifests_items
+        self._requirer_wrapper = KubernetesManifestRequirerWrapper(self._charm, self._relation_name)
 
         self.framework.observe(self._charm.on.leader_elected, self._on_send_data)
 
@@ -226,28 +259,47 @@ class KubernetesManifestsRequirer(Object):
 
             for evt in refresh_event:
                 self.framework.observe(evt, self._on_send_data)
-    
-    @property
-    def _manifests(self):
-        return [
-            item.get_manifest() for item in self._manifests_items
-        ]
 
     def _on_send_data(self, event: EventBase):
         """Handles any event where we should send data to the relation."""
+        self._requirer_wrapper.send_data(self._manifests_items)
+
+
+
+
+class KubernetesManifestRequirerWrapper(Object):
+    """
+    Wrapper for the relation data sending logic
+    """
+    def __init__(
+        self,
+        charm: CharmBase,
+        relation_name: str,
+    ):
+        self._charm = charm
+        self._relation_name = relation_name
+    
+    def _get_manifests_from_items(self, manifests_items: List[KubernetesManifest]):
+        return [
+            item.manifest for item in manifests_items
+        ]
+
+    def send_data(self, manifest_items: List[KubernetesManifest]):
         if not self._charm.model.unit.is_leader():
             logger.info(
                 "KubernetesManifestsRequirer handled send_data event when it is not the "
                 "leader.  Skipping event - no data sent."
             )
             return
-
+        
+        manifests = self._get_manifests_from_items(manifest_items)
         relations = self._charm.model.relations.get(self._relation_name)
 
         for relation in relations:
             relation_data = relation.data[self._charm.app]
-            manifests_as_json = json.dumps(self._manifests)
+            manifests_as_json = json.dumps(manifests)
             relation_data.update({KUBERNETES_MANIFESTS_FIELD: manifests_as_json})
+
 
 
 def get_name_of_breaking_app(relation_name: str) -> Optional[str]:

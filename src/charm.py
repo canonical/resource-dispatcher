@@ -226,7 +226,7 @@ class ResourceDispatcherOperator(CharmBase):
         manifests = self._get_manifests(manifests_provider)
         if not self._manifests_valid(manifests):
             self.logger.debug(
-                f"Manifests names in all relations must be unique {','.join(manifests)}"
+                f"Manifests names in all relations must be unique {','.join(str(m) for m in manifests)}"  # noqa E501
             )
             raise ErrorWithStatus(
                 "Failed to process invalid manifest. See debug logs.",

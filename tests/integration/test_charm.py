@@ -27,13 +27,16 @@ CHARM_NAME = "resource-dispatcher"
 MANIFEST_CHARM_NAME1 = "manifests-tester1"
 MANIFEST_CHARM_NAME2 = "manifests-tester2"
 MANIFESTS_REQUIRER_TESTER_CHARM = Path("tests/integration/manifests-tester").absolute()
+MANIFESTS_TESTER_CONFIG = yaml.safe_load(
+    Path("./tests/integration/manifests-tester/config.yaml").read_text()
+)
 METACONTROLLER_CHARM_NAME = "metacontroller-operator"
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 NAMESPACE_FILE = "./tests/integration/namespace.yaml"
 PODDEFAULTS_CRD_TEMPLATE = "./tests/integration/crds/poddefaults.yaml"
 TESTING_LABELS = ["user.kubeflow.org/enabled"]  # Might be more than one in the future
 SECRET_NAME = "mlpipeline-minio-artifact"
-SERVICE_ACCOUNT_NAME = "sa"
+SERVICE_ACCOUNT_NAME = MANIFESTS_TESTER_CONFIG["options"]["service_account_name"]["default"]
 TESTER1_SECRET_NAMES = ["mlpipeline-minio-artifact", "seldon-rclone-secret"]
 TESTER2_SECRET_NAMES = ["mlpipeline-minio-artifact2", "seldon-rclone-secret2"]
 PODDEFAULTS_NAMES = ["access-minio", "mlflow-server-minio"]
@@ -104,6 +107,7 @@ def namespace(lightkube_client: lightkube.Client):
     delete_all_from_yaml(yaml_text, lightkube_client)
 
 
+@pytest.mark.skip_if_deployed
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy_dispatcher_charm(ops_test: OpsTest):
     deploy_k8s_resources([PODDEFAULTS_CRD_TEMPLATE])
@@ -136,6 +140,7 @@ async def test_build_and_deploy_dispatcher_charm(ops_test: OpsTest):
     assert ops_test.model.applications[CHARM_NAME].units[0].workload_status == "active"
 
 
+@pytest.mark.skip_if_deployed
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy_helper_charms(ops_test: OpsTest, copy_libraries_into_tester_charm):
     build_manifests_charm_path = await ops_test.build_charm("./tests/integration/manifests-tester")
@@ -148,7 +153,7 @@ async def test_build_and_deploy_helper_charms(ops_test: OpsTest, copy_libraries_
         entity_url=build_manifests_charm_path,
         application_name=MANIFEST_CHARM_NAME2,
         trust=True,
-        config={"manifests_folder": "src/manifests2"},
+        config={"manifests_folder": "src/manifests2", "service_account_name": "config-secret-2"},
     )
 
     await ops_test.model.relate(f"{CHARM_NAME}:secrets", f"{MANIFEST_CHARM_NAME1}:secrets")
@@ -200,7 +205,6 @@ async def test_manifests_created_from_both_helpers(
 @pytest.mark.abort_on_fail
 async def test_remove_relation(ops_test: OpsTest):
     """Make sure that charm goes to active state after relation is removed"""
-    # There is no remove_relation method in opstest so calling it directly
     await ops_test.juju(
         "remove-relation", f"{CHARM_NAME}:secrets", f"{MANIFEST_CHARM_NAME1}:secrets"
     )

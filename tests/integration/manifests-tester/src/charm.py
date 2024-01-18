@@ -14,6 +14,7 @@ from typing import List
 import yaml
 from charms.resource_dispatcher.v0.resource_dispatcher import (
     KubernetesManifest,
+    KubernetesManifestRequirerWrapper,
     KubernetesManifestsRequirer,
 )
 from ops.charm import CharmBase
@@ -26,6 +27,16 @@ PODDEFAULTS_RELATION_NAME = "pod-defaults"
 SECRETS_RELATION_NAME = "secrets"
 SERVICEACCOUNTS_RELATION_NAME = "service-accounts"
 
+SERVICE_ACCOUNT_YAML = """
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {name}
+secrets:
+- name: s3creds
+
+"""
+
 
 class ManifestsTesterCharm(CharmBase):
     """Charm for sending manifests to ResourceDispatcher relations."""
@@ -36,21 +47,27 @@ class ManifestsTesterCharm(CharmBase):
         self._manifests_folder = self.model.config["manifests_folder"]
 
         self.framework.observe(self.on.start, self._on_start)
+        self.framework.observe(self.on.config_changed, self._update_service_accounts_relation_data)
+        self.framework.observe(self.on.leader_elected, self._update_service_accounts_relation_data)
+        self.framework.observe(
+            self.on[SERVICEACCOUNTS_RELATION_NAME].relation_created,
+            self._update_service_accounts_relation_data,
+        )
 
         self._poddefaults_manifests_requirer = KubernetesManifestsRequirer(
             charm=self,
             relation_name=PODDEFAULTS_RELATION_NAME,
             manifests_items=self._poddefaults_manifests,
         )
+
         self._secrets_manifests_requirer = KubernetesManifestsRequirer(
             charm=self,
             relation_name=SECRETS_RELATION_NAME,
             manifests_items=self._secrets_manifests,
         )
-        self._service_accounts_manifests_requirer = KubernetesManifestsRequirer(
-            charm=self,
-            relation_name=SERVICEACCOUNTS_RELATION_NAME,
-            manifests_items=self._serviceaccounts_manifests,
+
+        self.service_accounts_requirer_wrapper = KubernetesManifestRequirerWrapper(
+            charm=self, relation_name=SERVICEACCOUNTS_RELATION_NAME
         )
 
     @property
@@ -60,10 +77,6 @@ class ManifestsTesterCharm(CharmBase):
     @property
     def _secrets_manifests(self):
         return self._get_manifests(SECRETS_RELATION_NAME, self._manifests_folder)
-
-    @property
-    def _serviceaccounts_manifests(self):
-        return self._get_manifests(SERVICEACCOUNTS_RELATION_NAME, self._manifests_folder)
 
     def _get_manifests(self, resource_type, folder) -> List[KubernetesManifest]:
         manifests = []
@@ -75,7 +88,17 @@ class ManifestsTesterCharm(CharmBase):
 
     def _on_start(self, _):
         """Set active on start."""
+        self._send_manifest_from_config()
         self.model.unit.status = ActiveStatus()
+
+    def _update_service_accounts_relation_data(self, _):
+        self._send_manifest_from_config()
+
+    def _send_manifest_from_config(self):
+        service_account_name = self.model.config["service_account_name"]
+        config_manifest = SERVICE_ACCOUNT_YAML.format(name=service_account_name)
+        config_manifest_items = [KubernetesManifest(config_manifest)]
+        self.service_accounts_requirer_wrapper.send_data(config_manifest_items)
 
 
 if __name__ == "__main__":  # pragma: nocover

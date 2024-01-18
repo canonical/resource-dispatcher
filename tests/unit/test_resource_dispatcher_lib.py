@@ -12,12 +12,15 @@ from lib.charms.harness_extensions.v0.capture_events import capture
 from lib.charms.resource_dispatcher.v0.resource_dispatcher import (
     KUBERNETES_MANIFESTS_FIELD,
     KubernetesManifest,
+    KubernetesManifestRequirerWrapper,
     KubernetesManifestsProvider,
     KubernetesManifestsRequirer,
     KubernetesManifestsUpdatedEvent,
 )
 
-RELATION_NAME = "service-accounts"
+SERVICE_ACCOUNTS_RELATION = "service-accounts"
+
+SECRETS_RELATION = "secrets"
 
 DUMMY_PROVIDER_METADATA = """
 name: dummy-provider
@@ -30,6 +33,15 @@ name: dummy-requirer
 requires:
   service-accounts:
     interface: service-accounts
+  secrets:
+    interface: secrets
+"""
+
+DUMMY_REQUIRER_CONFIG = """
+options:
+  secret_name:
+    default: "config-secret"
+    type: string
 """
 
 MANIFEST_CONTENT1 = """
@@ -90,6 +102,18 @@ stringData:
   AWS_SECRET_ACCESS_KEY: secret_access_key
 """
 
+SECRET_YAML = """
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {name}
+  labels:
+    user.kubeflow.org/enabled: "true"
+stringData:
+  AWS_ACCESS_KEY_ID: access_key
+  AWS_SECRET_ACCESS_KEY: secret_access_key
+"""
+
 
 class DummyProviderCharm(CharmBase):
     """Mock charm that is a manifests Provider."""
@@ -97,7 +121,7 @@ class DummyProviderCharm(CharmBase):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.manifests_provider = KubernetesManifestsProvider(
-            charm=self, relation_name=RELATION_NAME
+            charm=self, relation_name=SERVICE_ACCOUNTS_RELATION
         )
 
 
@@ -106,11 +130,31 @@ class DummyRequirerCharm(CharmBase):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.manifests_requirer = KubernetesManifestsRequirer(
+        self.service_accounts_requirer = KubernetesManifestsRequirer(
             charm=self,
-            relation_name=RELATION_NAME,
+            relation_name=SERVICE_ACCOUNTS_RELATION,
             manifests_items=RELATION1_MANIFESTS,
         )
+
+
+class DummyRequirerWrapperCharm(CharmBase):
+    """Mock charm that uses the RequirerWrapper."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.secrets_requirer = KubernetesManifestRequirerWrapper(
+            charm=self, relation_name=SECRETS_RELATION
+        )
+
+        self.framework.observe(self.on.config_changed, self._send_secret)
+        self.framework.observe(self.on.leader_elected, self._send_secret)
+        self.framework.observe(self.on[SECRETS_RELATION].relation_created, self._send_secret)
+
+    def _send_secret(self, _):
+        secret_name = self.model.config["secret_name"]
+        config_manifest = SECRET_YAML.format(name=secret_name)
+        config_manifest_items = [KubernetesManifest(config_manifest)]
+        self.secrets_requirer.send_data(config_manifest_items)
 
 
 class TestKubernetesManifest:
@@ -138,21 +182,21 @@ class TestManifestsProvder:
         # Create data
         databag = {
             KUBERNETES_MANIFESTS_FIELD: json.dumps(
-                [manifest_item.get_manifest() for manifest_item in RELATION1_MANIFESTS]
+                [manifest_item.manifest for manifest_item in RELATION1_MANIFESTS]
             )
         }
 
         other_databag = {
             KUBERNETES_MANIFESTS_FIELD: json.dumps(
-                [manifest_item.get_manifest() for manifest_item in RELATION2_MANIFESTS]
+                [manifest_item.manifest for manifest_item in RELATION2_MANIFESTS]
             )
         }
 
         # Add data to relation
-        harness.add_relation(RELATION_NAME, other_app, app_data=databag)
+        harness.add_relation(SERVICE_ACCOUNTS_RELATION, other_app, app_data=databag)
 
         # Add to a second relation so we simulate having two relations of data
-        harness.add_relation(RELATION_NAME, other_app, app_data=other_databag)
+        harness.add_relation(SERVICE_ACCOUNTS_RELATION, other_app, app_data=other_databag)
 
         expected_manifests = [
             yaml.safe_load(content)
@@ -181,7 +225,7 @@ class TestManifestsProvder:
         harness = Harness(DummyProviderCharm, meta=DUMMY_PROVIDER_METADATA)
 
         # Add empty relation
-        harness.add_relation(RELATION_NAME, other_app)
+        harness.add_relation(SERVICE_ACCOUNTS_RELATION, other_app)
 
         expected_manifests = []
 
@@ -208,7 +252,7 @@ class TestManifestsProvder:
         harness.begin()
 
         # Act/Assert
-        relation_id = harness.add_relation(RELATION_NAME, other_app)
+        relation_id = harness.add_relation(SERVICE_ACCOUNTS_RELATION, other_app)
 
         # Add data to relation
         # Assert that we emit a data_updated event
@@ -231,7 +275,9 @@ class TestManifestsRequirer:
         other_app = "provider"
         this_app = harness.model.app
 
-        relation_id = harness.add_relation(relation_name=RELATION_NAME, remote_app=other_app)
+        relation_id = harness.add_relation(
+            relation_name=SERVICE_ACCOUNTS_RELATION, remote_app=other_app
+        )
 
         harness.begin()
         # Confirm that we have no data in the relation yet
@@ -246,7 +292,7 @@ class TestManifestsRequirer:
         # Assert
         actual_manifests = get_manifests_from_relation(harness, relation_id, harness.model.app)
 
-        assert actual_manifests == [item.get_manifest() for item in RELATION1_MANIFESTS]
+        assert actual_manifests == [item.manifest for item in RELATION1_MANIFESTS]
 
     def test_send_manifests_on_relation_created(self):
         """Test that the Requirer correctly handles the relation created event."""
@@ -257,12 +303,14 @@ class TestManifestsRequirer:
         harness.begin()
 
         # Act
-        relation_id = harness.add_relation(relation_name=RELATION_NAME, remote_app=other_app)
+        relation_id = harness.add_relation(
+            relation_name=SERVICE_ACCOUNTS_RELATION, remote_app=other_app
+        )
 
         # Assert
         actual_manifests = get_manifests_from_relation(harness, relation_id, harness.model.app)
 
-        assert actual_manifests == [item.get_manifest() for item in RELATION1_MANIFESTS]
+        assert actual_manifests == [item.manifest for item in RELATION1_MANIFESTS]
 
     def test_send_manifests_without_leadership(self):
         """Tests whether library incorrectly sends manifests data when unit is not leader."""
@@ -274,7 +322,9 @@ class TestManifestsRequirer:
 
         # Act
         # This should do nothing because we are not the leader
-        relation_id = harness.add_relation(relation_name=RELATION_NAME, remote_app=other_app)
+        relation_id = harness.add_relation(
+            relation_name=SERVICE_ACCOUNTS_RELATION, remote_app=other_app
+        )
 
         # Assert
         # There should be no data in the relation, because we should skip writing data when not
@@ -284,8 +334,50 @@ class TestManifestsRequirer:
         )
         assert raw_relation_data == {}
 
+    def test_send_rendered_manifests_default_config(self):
+        """Test that the RequirerWrapper sends the relation data with the default config on charm startup."""
+        # Arrange
+        default_secret_name = yaml.safe_load(DUMMY_REQUIRER_CONFIG)["options"]["secret_name"][
+            "default"
+        ]
 
-def get_manifests_from_relation(harness, relation_id, this_app) -> List[KubernetesManifest]:
+        harness = Harness(
+            DummyRequirerWrapperCharm, meta=DUMMY_REQUIRER_METADATA, config=DUMMY_REQUIRER_CONFIG
+        )
+        other_app = "provider"
+
+        # Act
+        harness.set_leader(True)
+        harness.begin()
+        relation_id = harness.add_relation(relation_name=SECRETS_RELATION, remote_app=other_app)
+
+        # Assert
+        actual_manifests = get_manifests_from_relation(harness, relation_id, harness.model.app)
+
+        assert actual_manifests == [yaml.safe_load(SECRET_YAML.format(name=default_secret_name))]
+
+    def test_send_rendered_manifests_config_changed(self):
+        """Test that the RequirerWrapper sends the relation data on config changed."""
+        # Arrange
+        harness = Harness(
+            DummyRequirerWrapperCharm, meta=DUMMY_REQUIRER_METADATA, config=DUMMY_REQUIRER_CONFIG
+        )
+        other_app = "provider"
+
+        # Act
+        relation_id = harness.add_relation(relation_name=SECRETS_RELATION, remote_app=other_app)
+        harness.set_leader(True)
+        harness.begin()
+        updated_secret_name = "new-secret"
+        harness.update_config({"secret_name": updated_secret_name})
+
+        # Assert
+        actual_manifests = get_manifests_from_relation(harness, relation_id, harness.model.app)
+
+        assert actual_manifests == [yaml.safe_load(SECRET_YAML.format(name=updated_secret_name))]
+
+
+def get_manifests_from_relation(harness, relation_id, this_app) -> List[dict]:
     """Returns the list of KubernetesManifests from a service-account relation on a harness."""
     raw_relation_data = harness.get_relation_data(relation_id=relation_id, app_or_unit=this_app)
     actual_manifests = json.loads(raw_relation_data[KUBERNETES_MANIFESTS_FIELD])

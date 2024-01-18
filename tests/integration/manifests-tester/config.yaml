@@ -7,3 +7,6 @@ options:
   manifests_folder:
     default: src/manifests1
     type: string
+  service_account_name:
+    default: "default-sa"
+    type: string

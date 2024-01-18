@@ -113,7 +113,7 @@ def add_secret_relation_to_harness(harness: Harness) -> Harness:
         KubernetesManifest(yaml.dump(SECRET2)),
     ]
     databag = {
-        KUBERNETES_MANIFESTS_FIELD: json.dumps([item.get_manifest() for item in secret_manifests])
+        KUBERNETES_MANIFESTS_FIELD: json.dumps([item.manifest for item in secret_manifests])
     }
     secret_relation_id = harness.add_relation("secrets", "mlflow-server")
     harness.add_relation_unit(secret_relation_id, "mlflow-server/0")

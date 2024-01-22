@@ -3,7 +3,7 @@
 
 import base64
 import logging
-import subprocess
+import shutil
 import time
 from pathlib import Path
 
@@ -25,18 +25,30 @@ logger = logging.getLogger(__name__)
 CHARM_NAME = "resource-dispatcher"
 MANIFEST_CHARM_NAME1 = "manifests-tester1"
 MANIFEST_CHARM_NAME2 = "manifests-tester2"
+MANIFESTS_REQUIRER_TESTER_CHARM = Path("tests/integration/manifests-tester").absolute()
+MANIFESTS_TESTER_CONFIG = yaml.safe_load(
+    Path("./tests/integration/manifests-tester/config.yaml").read_text()
+)
 METACONTROLLER_CHARM_NAME = "metacontroller-operator"
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 NAMESPACE_FILE = "./tests/integration/namespace.yaml"
 PODDEFAULTS_CRD_TEMPLATE = "./tests/integration/crds/poddefaults.yaml"
 TESTING_LABELS = ["user.kubeflow.org/enabled"]  # Might be more than one in the future
 SECRET_NAME = "mlpipeline-minio-artifact"
-SERVICE_ACCOUNT_NAME = "sa"
+SERVICE_ACCOUNT_NAME = MANIFESTS_TESTER_CONFIG["options"]["service_account_name"]["default"]
 TESTER1_SECRET_NAMES = ["mlpipeline-minio-artifact", "seldon-rclone-secret"]
 TESTER2_SECRET_NAMES = ["mlpipeline-minio-artifact2", "seldon-rclone-secret2"]
 PODDEFAULTS_NAMES = ["access-minio", "mlflow-server-minio"]
 
 PodDefault = create_namespaced_resource("kubeflow.org", "v1alpha1", "PodDefault", "poddefaults")
+
+
+@pytest.fixture(scope="module")
+def copy_libraries_into_tester_charm() -> None:
+    """Ensure that the tester charms use the current libraries."""
+    lib = Path("lib/charms/kubernetes_manifests/v0/kubernetes_manifests.py")
+    Path(MANIFESTS_REQUIRER_TESTER_CHARM, lib.parent).mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(lib.as_posix(), (MANIFESTS_REQUIRER_TESTER_CHARM / lib).as_posix())
 
 
 def _safe_load_file_to_text(filename: str) -> str:
@@ -127,7 +139,7 @@ async def test_build_and_deploy_dispatcher_charm(ops_test: OpsTest):
 
 
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy_helper_charms(ops_test: OpsTest):
+async def test_build_and_deploy_helper_charms(ops_test: OpsTest, copy_libraries_into_tester_charm):
     build_manifests_charm_path = await ops_test.build_charm("./tests/integration/manifests-tester")
     await ops_test.model.deploy(
         entity_url=build_manifests_charm_path,
@@ -138,7 +150,7 @@ async def test_build_and_deploy_helper_charms(ops_test: OpsTest):
         entity_url=build_manifests_charm_path,
         application_name=MANIFEST_CHARM_NAME2,
         trust=True,
-        config={"manifests_folder": "src/manifests2"},
+        config={"manifests_folder": "src/manifests2", "service_account_name": "config-secret-2"},
     )
 
     await ops_test.model.relate(f"{CHARM_NAME}:secrets", f"{MANIFEST_CHARM_NAME1}:secrets")
@@ -190,9 +202,8 @@ async def test_manifests_created_from_both_helpers(
 @pytest.mark.abort_on_fail
 async def test_remove_relation(ops_test: OpsTest):
     """Make sure that charm goes to active state after relation is removed"""
-    # There is no remove_relation method in opstest so calling it directly
-    subprocess.Popen(
-        ["juju", "remove-relation", f"{CHARM_NAME}:secrets", f"{MANIFEST_CHARM_NAME1}:secrets"]
+    await ops_test.juju(
+        "remove-relation", f"{CHARM_NAME}:secrets", f"{MANIFEST_CHARM_NAME1}:secrets"
     )
     await ops_test.model.wait_for_idle(
         apps=[CHARM_NAME, METACONTROLLER_CHARM_NAME, MANIFEST_CHARM_NAME1, MANIFEST_CHARM_NAME2],

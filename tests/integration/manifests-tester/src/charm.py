@@ -9,14 +9,33 @@ import glob
 import json
 import logging
 from pathlib import Path
+from typing import List
 
 import yaml
+from charms.kubernetes_manifests.v0.kubernetes_manifests import (
+    KubernetesManifest,
+    KubernetesManifestRequirerWrapper,
+    KubernetesManifestsRequirer,
+)
 from ops.charm import CharmBase
 from ops.main import main
 from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
-from serialized_data_interface import NoCompatibleVersions, NoVersionsListed, get_interfaces
 
 logger = logging.getLogger(__name__)
+
+PODDEFAULTS_RELATION_NAME = "pod-defaults"
+SECRETS_RELATION_NAME = "secrets"
+SERVICEACCOUNTS_RELATION_NAME = "service-accounts"
+
+SERVICE_ACCOUNT_YAML = """
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {name}
+secrets:
+- name: s3creds
+
+"""
 
 
 class ManifestsTesterCharm(CharmBase):
@@ -28,46 +47,58 @@ class ManifestsTesterCharm(CharmBase):
         self._manifests_folder = self.model.config["manifests_folder"]
 
         self.framework.observe(self.on.start, self._on_start)
-        self.framework.observe(self.on.config_changed, self._on_event)
+        self.framework.observe(self.on.config_changed, self._update_service_accounts_relation_data)
+        self.framework.observe(self.on.leader_elected, self._update_service_accounts_relation_data)
+        self.framework.observe(
+            self.on[SERVICEACCOUNTS_RELATION_NAME].relation_created,
+            self._update_service_accounts_relation_data,
+        )
 
-        for rel in self.model.relations.keys():
-            self.framework.observe(self.on[rel].relation_changed, self._on_event)
+        self._poddefaults_manifests_requirer = KubernetesManifestsRequirer(
+            charm=self,
+            relation_name=PODDEFAULTS_RELATION_NAME,
+            manifests_items=self._poddefaults_manifests,
+        )
+
+        self._secrets_manifests_requirer = KubernetesManifestsRequirer(
+            charm=self,
+            relation_name=SECRETS_RELATION_NAME,
+            manifests_items=self._secrets_manifests,
+        )
+
+        self.service_accounts_requirer_wrapper = KubernetesManifestRequirerWrapper(
+            charm=self, relation_name=SERVICEACCOUNTS_RELATION_NAME
+        )
+
+    @property
+    def _poddefaults_manifests(self):
+        return self._get_manifests(PODDEFAULTS_RELATION_NAME, self._manifests_folder)
+
+    @property
+    def _secrets_manifests(self):
+        return self._get_manifests(SECRETS_RELATION_NAME, self._manifests_folder)
+
+    def _get_manifests(self, resource_type, folder) -> List[KubernetesManifest]:
+        manifests = []
+        manifest_files = glob.glob(f"{folder}/{resource_type}/*.yaml")
+        for file in manifest_files:
+            file_content = Path(file).read_text()
+            manifests.append(KubernetesManifest(file_content))
+        return manifests
 
     def _on_start(self, _):
         """Set active on start."""
+        self._send_manifest_from_config()
         self.model.unit.status = ActiveStatus()
 
-    def _get_interfaces(self):
-        """Retrieve interface object."""
-        try:
-            interfaces = get_interfaces(self)
-        except NoVersionsListed:
-            self.model.unit.status = WaitingStatus()
-            return {"secrets": None, "pod-defaults": None, "service-accounts": None}
-        except NoCompatibleVersions:
-            self.model.unit.status = BlockedStatus()
-            return {"secrets": None, "pod-defaults": None, "service-accounts": None}
-        return interfaces
+    def _update_service_accounts_relation_data(self, _):
+        self._send_manifest_from_config()
 
-    def _send_manifests(self, interfaces, folder, relation):
-        """Send manifests from folder to desired relation."""
-        if relation in interfaces and interfaces[relation]:
-            manifests = []
-            logger.info(f"Scanning folder {folder}/{relation}")
-            manifest_files = glob.glob(f"{folder}/{relation}/*.yaml")
-            for file in manifest_files:
-                manifest = yaml.safe_load(Path(file).read_text())
-                manifests.append(manifest)
-            data = {relation: json.dumps(manifests)}
-            interfaces[relation].send_data(data)
-
-    def _on_event(self, _) -> None:
-        """Perform all required actions for the Charm."""
-        interfaces = self._get_interfaces()
-        self._send_manifests(interfaces, self._manifests_folder, "secrets")
-        self._send_manifests(interfaces, self._manifests_folder, "service-accounts")
-        self._send_manifests(interfaces, self._manifests_folder, "pod-defaults")
-        self.model.unit.status = ActiveStatus()
+    def _send_manifest_from_config(self):
+        service_account_name = self.model.config["service_account_name"]
+        config_manifest = SERVICE_ACCOUNT_YAML.format(name=service_account_name)
+        config_manifest_items = [KubernetesManifest(config_manifest)]
+        self.service_accounts_requirer_wrapper.send_data(config_manifest_items)
 
 
 if __name__ == "__main__":  # pragma: nocover

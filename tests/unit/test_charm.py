@@ -247,7 +247,7 @@ class TestCharm:
         harness = add_secret_relation_to_harness(harness)
         harness.set_leader(True)
         harness.begin()
-        secrets = harness.charm._get_manifests(harness.charm._secrets_manifests_provider)
+        secrets = harness.charm._secrets_manifests_provider.get_manifests()
         assert secrets == [SECRET1, SECRET2]
 
     @patch(
@@ -272,34 +272,34 @@ class TestCharm:
         "charm.KubernetesServicePatch",
         lambda x, y, service_name, service_type, refresh_event: None,
     )
-    @patch("charm.ResourceDispatcherOperator._get_manifests")
+    @patch("charm.ResourceDispatcherOperator.secrets_manifests_provider")
     @patch("charm.ResourceDispatcherOperator._sync_manifests")
     def test_update_manifests_success(
-        self, sync_manifests: MagicMock, get_manifests: MagicMock, harness: Harness
+        self, sync_manifests: MagicMock, secrets_manifests_provider: MagicMock, harness: Harness
     ):
-        get_manifests.return_value = ""
         harness.begin()
-        harness.charm._update_manifests(harness.charm._secrets_manifests_provider, "")
+        secrets_manifests_provider.get_manifests.return_value = ""
+        harness.charm._update_manifests(secrets_manifests_provider, "")
         sync_manifests.assert_called_with("", "")
 
     @patch(
         "charm.KubernetesServicePatch",
         lambda x, y, service_name, service_type, refresh_event: None,
     )
-    @patch("charm.ResourceDispatcherOperator._get_manifests")
+    @patch("charm.ResourceDispatcherOperator.secrets_manifests_provider")
     @patch("charm.ResourceDispatcherOperator._sync_manifests")
     @patch("charm.ResourceDispatcherOperator._manifests_valid")
     def test_update_manifests_invalid_manifests(
         self,
         manifests_valid: MagicMock,
         _: MagicMock,
-        get_manifests: MagicMock,
+        secrets_manifests_provider: MagicMock,
         harness: Harness,
     ):
         manifests_valid.return_value = False
-        get_manifests.return_value = ""
+        secrets_manifests_provider.get_manifests.return_value = ""
         harness.begin()
         with pytest.raises(ErrorWithStatus) as e_info:
-            harness.charm._update_manifests(harness.charm._secrets_manifests_provider, "")
+            harness.charm._update_manifests(secrets_manifests_provider, "")
         assert "Failed to process invalid manifest. See debug logs" in str(e_info)
         assert e_info.value.status_type(BlockedStatus)

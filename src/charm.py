@@ -88,6 +88,21 @@ class ResourceDispatcherOperator(CharmBase):
         return self._container
 
     @property
+    def poddefaults_manifests_provider(self):
+        """Returns the KubernetesManifestsProvider for Pod Defaults"""
+        return self._poddefaults_manifests_provider
+
+    @property
+    def secrets_manifests_provider(self):
+        """Returns the KubernetesManifestsProvider for Secrets"""
+        return self._secrets_manifests_provider
+
+    @property
+    def service_accounts_manifests_provider(self):
+        """Returns the KubernetesManifestsProvider for Service Accounts"""
+        return self._service_accounts_manifests_provider
+
+    @property
     def _resource_dispatcher_operator_layer(self) -> Layer:
         """Create and return Pebble framework layer."""
         layer_config = {
@@ -168,14 +183,6 @@ class ResourceDispatcherOperator(CharmBase):
             except ChangeError as err:
                 raise GenericCharmRuntimeError(f"Failed to replan with error: {str(err)}") from err
 
-    def _get_manifests(self, manifests_provider):
-        """Unpacks and returns the manifests relation data."""
-
-        manifests = []
-        manifests = manifests_provider.get_manifests()
-        self.logger.debug(f"manifests are {manifests}")
-        return manifests
-
     def _manifests_valid(self, manifests):
         """Checks if manifests are unique."""
         if manifests:
@@ -223,7 +230,8 @@ class ResourceDispatcherOperator(CharmBase):
 
     def _update_manifests(self, manifests_provider, dispatch_folder):
         """Get manifests from relation and update them in dispatcher folder."""
-        manifests = self._get_manifests(manifests_provider)
+        manifests = manifests_provider.get_manifests()
+        self.logger.debug(f"manifests are {manifests}")
         if not self._manifests_valid(manifests):
             self.logger.debug(
                 f"Manifests names in all relations must be unique {','.join(str(m) for m in manifests)}"  # noqa E501

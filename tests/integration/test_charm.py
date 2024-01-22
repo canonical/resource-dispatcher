@@ -107,7 +107,6 @@ def namespace(lightkube_client: lightkube.Client):
     delete_all_from_yaml(yaml_text, lightkube_client)
 
 
-@pytest.mark.skip_if_deployed
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy_dispatcher_charm(ops_test: OpsTest):
     deploy_k8s_resources([PODDEFAULTS_CRD_TEMPLATE])
@@ -140,7 +139,6 @@ async def test_build_and_deploy_dispatcher_charm(ops_test: OpsTest):
     assert ops_test.model.applications[CHARM_NAME].units[0].workload_status == "active"
 
 
-@pytest.mark.skip_if_deployed
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy_helper_charms(ops_test: OpsTest, copy_libraries_into_tester_charm):
     build_manifests_charm_path = await ops_test.build_charm("./tests/integration/manifests-tester")

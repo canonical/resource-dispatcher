@@ -1,6 +1,6 @@
 """KubernetesManifests Library
 
-This library implements data transfer for Kubernetes manifests. The library can be used by the requirer
+This library implements data transfer for the kubernetes_manifest interface. The library can be used by the requirer
 charm to send Kubernetes manifests to the provider charm.
 
 ## Getting Started
@@ -23,12 +23,21 @@ In your charm do:
 from charms.kubernetes_manifests.v0.kubernetes_manifests import KubernetesManifestsRequirer, KubernetesManifest
 # ...
 
-MANIFESTS = [
+SECRETS_MANIFESTS = [
     KubernetesManifest(
-    Path(YAML_FILE_PATH).read_text()
+    Path(SECRET1_PATH).read_text()
     ),
     KubernetesManifest(
-    Path(OTHER_YAML_FILE_PATH).read_text()
+    Path(SECRET2_PATH).read_text()
+    ),
+]
+
+SA_MANIFESTS = [
+    KubernetesManifest(
+    Path(SA1_PATH).read_text()
+    ),
+    KubernetesManifest(
+    Path(SA2_PATH).read_text()
     ),
 ]
 
@@ -55,10 +64,18 @@ class SomeCharm(CharmBase):
             charm = self,
             relation_name = "secrets"
         )
+        self._service_accounts_manifests_wrapper = KubernetesManifestsRequirerWrapper(
+            charm = self,
+            relation_name = "service-accounts"
+        )
 
         self.framework.observe(self.on.leader_elected, self._send_secret)
         self.framework.observe(self.on["secrets"].relation_created, self._send_secret)
-        # observe all the other events for when the manifests change
+        # observe all the other events for when the secrets manifests change
+
+        self.framework.observe(self.on.leader_elected, self._send_service_account)
+        self.framework.observe(self.on["service-accounts"].relation_created, self._send_service_account)
+        # observe all the other events for when the service accounts manifests change
 
     def _send_secret(self, _):
         #...
@@ -66,7 +83,16 @@ class SomeCharm(CharmBase):
         rendered_manifests = ...
         #...
         manifest_items = [KubernetesManifest(rendered_manifests)]
-        self.secrets_requirer.send_data(manifest_items)
+        self._secrets_manifests_wrapper.send_data(manifest_items)
+
+
+    def _send_service_account(self, _):
+        #...
+        Write the logic to re-calculate the manifests
+        rendered_manifests = ...
+        #...
+        manifest_items = [KubernetesManifest(rendered_manifests)]
+        self._service_accounts_manifests_wrapper.send_data(manifest_items)
 ```
 """
 import json
@@ -280,6 +306,7 @@ class KubernetesManifestRequirerWrapper(Object):
         ]
 
     def send_data(self, manifest_items: List[KubernetesManifest]):
+        """Sends the manifests data to the relation in json format."""
         if not self._charm.model.unit.is_leader():
             logger.info(
                 "KubernetesManifestsRequirer handled send_data event when it is not the "

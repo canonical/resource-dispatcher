@@ -4,7 +4,6 @@
 import base64
 import logging
 import shutil
-import subprocess
 import time
 from pathlib import Path
 

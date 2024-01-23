@@ -9,8 +9,8 @@ import yaml
 from charmed_kubeflow_chisme.exceptions import ErrorWithStatus, GenericCharmRuntimeError
 from charmed_kubeflow_chisme.kubernetes import KubernetesResourceHandler
 from charmed_kubeflow_chisme.lightkube.batch import delete_many
-from charms.kubernetes_manifests.v0.kubernetes_manifests import KubernetesManifestsProvider
 from charms.observability_libs.v1.kubernetes_service_patch import KubernetesServicePatch
+from charms.resource_dispatcher.v0.kubernetes_manifests import KubernetesManifestsProvider
 from lightkube import ApiError
 from lightkube.generic_resource import load_in_cluster_generic_resources
 from lightkube.models.core_v1 import ServicePort

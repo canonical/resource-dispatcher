@@ -9,7 +9,7 @@ To get started using the library, fetch the library with `charmcraft`.
 
 ```shell
 cd some-charm
-charmcraft fetch-lib charms.kubernetes_manifests.v0.kubernetes_manifests
+charmcraft fetch-lib charms.resource_dispatcher.v0.kubernetes_manifests
 ```
 
 In your charm, the library can be used in two ways depending on whether the manifests
@@ -20,7 +20,7 @@ If the manifests are static, instantiate the KubernetesManifestsRequirer.
 In your charm do:
 
 ```python
-from charms.kubernetes_manifests.v0.kubernetes_manifests import KubernetesManifestsRequirer, KubernetesManifest
+from charms.resource_dispatcher.v0.kubernetes_manifests import KubernetesManifestsRequirer, KubernetesManifest
 # ...
 
 SECRETS_MANIFESTS = [

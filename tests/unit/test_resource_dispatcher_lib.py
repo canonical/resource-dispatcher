@@ -9,7 +9,7 @@ from ops.charm import CharmBase
 from ops.testing import Harness
 
 from lib.charms.harness_extensions.v0.capture_events import capture
-from lib.charms.kubernetes_manifests.v0.kubernetes_manifests import (
+from lib.charms.resource_dispatcher.v0.kubernetes_manifests import (
     KUBERNETES_MANIFESTS_FIELD,
     KubernetesManifest,
     KubernetesManifestRequirerWrapper,

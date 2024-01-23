@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 import yaml
 from charmed_kubeflow_chisme.exceptions import ErrorWithStatus, GenericCharmRuntimeError
-from charms.kubernetes_manifests.v0.kubernetes_manifests import (
+from charms.resource_dispatcher.v0.kubernetes_manifests import (
     KUBERNETES_MANIFESTS_FIELD,
     KubernetesManifest,
 )

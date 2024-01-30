@@ -5,7 +5,7 @@ summary: |
   Charm for sending manifests to ResourceDispatcher relations.
 description: |
   Charm for sending manifests to ResourceDispatcher relations.
-provides:
+requires:
   secrets:
     interface: kubernetes_manifest
   service-accounts:

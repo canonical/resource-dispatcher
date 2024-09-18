@@ -4,9 +4,9 @@ output "app_name" {
 
 output "provides" {
   value = {
-	secrets          = "secrets"
-	service_accounts = "service-accounts"
-	pod_defaults     = "pod-defaults"
+    secrets          = "secrets"
+    service_accounts = "service-accounts"
+    pod_defaults     = "pod-defaults"
   }
 }
 

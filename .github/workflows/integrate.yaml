@@ -58,6 +58,7 @@ jobs:
       charm-path: .
       model: kubeflow
       channel: latest/edge
+      apply: false
       
   integration:
     name: Integration Test (build and deploy)

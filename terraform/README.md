@@ -43,7 +43,7 @@ resource "juju_model" "testing" {
   name = kubeflow
 }
 
-module "resource_dispatcher" {
+module "resource-dispatcher" {
   source = "<path-to-this-directory>"
   model_name = juju_model.testing.name
 }
@@ -56,7 +56,7 @@ data "juju_model" "testing" {
   name = var.model_name
 }
 
-module "resource_dispatcher" {
+module "resource-dispatcher" {
   source = "<path-to-this-directory>"
   model_name = data.juju_model.testing.name
 }

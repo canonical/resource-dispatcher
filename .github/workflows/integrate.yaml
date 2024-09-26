@@ -51,6 +51,16 @@ jobs:
     - name: Run unit tests
       run: tox -e unit
 
+  terraform-checks:
+    name: Terraform
+    uses: canonical/charmed-kubeflow-workflows/.github/workflows/terraform-checks.yaml@main
+    with:
+      charm-path: .
+      channel: 2.0/stable
+      # Don't run this workflow since the charm goes to `Error` state when deployed on its own
+      # See: https://github.com/canonical/resource-dispatcher/issues/66
+      apply: false
+      
   integration:
     name: Integration Test (build and deploy)
     runs-on: ubuntu-20.04

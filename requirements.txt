@@ -24,7 +24,7 @@ cffi==1.17.1
     # via
     #   cryptography
     #   pynacl
-charmed-kubeflow-chisme==0.4.3
+charmed-kubeflow-chisme==0.4.4
     # via -r requirements.in
 charset-normalizer==3.4.0
     # via requests
@@ -34,14 +34,16 @@ deepdiff==6.2.1
     # via charmed-kubeflow-chisme
 exceptiongroup==1.2.2
     # via anyio
-google-auth==2.36.0
+google-auth==2.37.0
     # via kubernetes
 h11==0.14.0
     # via httpcore
 httpcore==1.0.7
     # via httpx
 httpx==0.27.2
-    # via lightkube
+    # via
+    #   charmed-kubeflow-chisme
+    #   lightkube
 hvac==2.3.0
     # via juju
 idna==3.10
@@ -59,7 +61,7 @@ juju==3.6.0.0
     # via charmed-kubeflow-chisme
 kubernetes==30.1.0
     # via juju
-lightkube==0.15.6
+lightkube==0.15.7
     # via charmed-kubeflow-chisme
 lightkube-models==1.31.1.8
     # via

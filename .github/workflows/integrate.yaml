@@ -64,11 +64,12 @@ jobs:
   integration:
     name: Integration Test (build and deploy)
     runs-on: ubuntu-20.04
-    matrix:
-      # We test with highest and lowest supported versions of k8s
-      microk8s-versions:
-        - 1.29-strict/stable
-        - 1.31-strict/stable
+    strategy:
+      matrix:
+        # We test with highest and lowest supported versions of k8s
+        microk8s-versions:
+          - 1.29-strict/stable
+          - 1.31-strict/stable
 
     steps:
     - name: Check out repo

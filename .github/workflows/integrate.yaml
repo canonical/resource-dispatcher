@@ -66,7 +66,7 @@ jobs:
     runs-on: ubuntu-20.04
     strategy:
       matrix:
-        # We test with highest and lowest supported versions of k8s
+        # We test with the highest supported version on every supported release
         microk8s-versions:
           - 1.29-strict/stable
           - 1.31-strict/stable

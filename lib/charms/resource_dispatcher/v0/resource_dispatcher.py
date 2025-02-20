@@ -1,5 +1,9 @@
 """KubernetesManifests Library
 
+NOTE: This library should not be used anymore as it was incorrectly created.
+While the contents of this file are identical to the kubernetes_manifests.py
+library, that other one should be used instead.
+
 This library implements data transfer for the kubernetes_manifest interface. The library can be used by the requirer
 charm to send Kubernetes manifests to the provider charm.
 

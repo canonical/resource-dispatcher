@@ -1,5 +1,9 @@
 """KubernetesManifests Library
 
+NOTE: This library should not be used anymore as it was incorrectly created.
+While the contents of this file are identical to the kubernetes_manifests.py
+library, that other one should be used instead.
+
 This library implements data transfer for the kubernetes_manifest interface. The library can be used by the requirer
 charm to send Kubernetes manifests to the provider charm.
 
@@ -9,7 +13,7 @@ To get started using the library, fetch the library with `charmcraft`.
 
 ```shell
 cd some-charm
-charmcraft fetch-lib charms.resource_dispatcher.v0.kubernetes_manifests
+charmcraft fetch-lib charms.resource_dispatcher.v0.resource_dispatcher
 ```
 
 In your charm, the library can be used in two ways depending on whether the manifests
@@ -20,7 +24,7 @@ If the manifests are static, instantiate the KubernetesManifestsRequirer.
 In your charm do:
 
 ```python
-from charms.resource_dispatcher.v0.kubernetes_manifests import KubernetesManifestsRequirer, KubernetesManifest
+from charms.resource_dispatcher.v0.resource_dispatcher import KubernetesManifestsRequirer, KubernetesManifest
 # ...
 
 SECRETS_MANIFESTS = [
@@ -108,7 +112,7 @@ from ops.framework import BoundEvent, EventBase, EventSource, Object, ObjectEven
 logger = logging.getLogger(__name__)
 
 # The unique Charmhub library identifier, never change it
-LIBID = "4254ac012d3640ccbe0ac5380b2436c8"
+LIBID = "372e7e90201741ba80006fc43fd81b49"
 
 # Increment this major API version when introducing breaking changes
 LIBAPI = 0
@@ -117,7 +121,7 @@ LIBAPI = 0
 # to 0 if you are raising the major API version
 LIBPATCH = 1
 
-KUBERNETES_MANIFESTS_FIELD = "kubernetes_manifests"
+KUBERNETES_MANIFESTS_FIELD = "resource_dispatcher"
 
 
 @dataclass
@@ -299,7 +303,7 @@ class KubernetesManifestRequirerWrapper(Object):
     ):
         self._charm = charm
         self._relation_name = relation_name
-
+    
     def _get_manifests_from_items(self, manifests_items: List[KubernetesManifest]):
         return [
             item.manifest for item in manifests_items
@@ -313,7 +317,7 @@ class KubernetesManifestRequirerWrapper(Object):
                 "leader.  Skipping event - no data sent."
             )
             return
-
+        
         manifests = self._get_manifests_from_items(manifest_items)
         relations = self._charm.model.relations.get(self._relation_name)
 
@@ -331,12 +335,12 @@ def get_name_of_breaking_app(relation_name: str) -> Optional[str]:
     If the application name is available, returns the name as a string;
     otherwise None.
     """
-    # In the case of a relation-broken event, Juju non-deterministically may or may not include
-    # the breaking remote app's data in the relation data bag.  If this data is still in the data
-    # bag, the `JUJU_REMOTE_APP` name will always be set.  For these cases, we return the
+    # In the case of a relation-broken event, Juju non-deterministically may or may not include 
+    # the breaking remote app's data in the relation data bag.  If this data is still in the data 
+    # bag, the `JUJU_REMOTE_APP` name will always be set.  For these cases, we return the 
     # remote app name so the caller can remove that app from the data bag before using it.
     #
-    # To catch these cases, we inspect the following environment variables managed by Juju:
+    # To catch these cases, we inspect the following environment variables managed by Juju: 
     #   JUJU_REMOTE_APP: the name of the app we are interacting with on this relation event
     #   JUJU_RELATION: the name of the relation we are interacting with on this relation event
     #   JUJU_HOOK_NAME: the name of the relation event, such as RELATION_NAME-relation-broken
@@ -350,5 +354,5 @@ def get_name_of_breaking_app(relation_name: str) -> Optional[str]:
     if not os.environ.get("JUJU_HOOK_NAME", None) == f"{relation_name}-relation-broken":
         # Not the relation-broken event
         return None
-
+    
     return os.environ.get("JUJU_REMOTE_APP", None)

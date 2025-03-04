@@ -57,7 +57,9 @@ jobs:
         python-version: 3.8
 
     - name: Install dependencies
-      run: sudo apt-get install python3-pip tox
+      run: |
+        # sudo apt-get install python3-pip tox
+        pip install tox
 
     - name: Run unit tests
       run: tox -e unit

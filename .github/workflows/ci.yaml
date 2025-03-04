@@ -69,13 +69,13 @@ jobs:
   build:
     strategy:
       matrix:
-        charm: ${{ fromJSON(needs.get-charm-paths-channel.outputs.charm-paths) }}
-    name: Build charm | ${{ matrix.charm }}
-    needs:
-      - get-charm-paths-channel
+        path:
+          - .
+          - tests/integration/manifests-tester
+    name: Build charm | ${{ matrix.path }}
     uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@v29.0.0
     with:
-      path-to-charm-directory: ${{ matrix.charm }}
+      path-to-charm-directory: ${{ matrix.path }}
 
   release:
     name: Release charm to Charmhub branch
@@ -93,6 +93,8 @@ jobs:
   integration:
     name: Integration Test (build and deploy)
     runs-on: ubuntu-24.04
+    needs:
+      - build
 
     steps:
     - name: Check out repo

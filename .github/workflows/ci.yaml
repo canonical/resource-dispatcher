@@ -78,10 +78,7 @@ jobs:
       path-to-charm-directory: ${{ matrix.charm }}
 
   release:
-    strategy:
-      matrix:
-        charm: ${{ fromJSON(needs.get-charm-paths-channel.outputs.charm-paths) }}
-    name: Release charm to Charmhub branch | ${{ matrix.charm }}
+    name: Release charm to Charmhub branch
     if: ${{ github.event_name == 'pull_request' }}
     needs:
       - build
@@ -89,7 +86,6 @@ jobs:
     with:
       channel: ${{ needs.get-charm-paths-channel.outputs.charm-channel }}
       artifact-prefix: ${{ needs.build.outputs.artifact-prefix }}
-      path-to-charm-directory: ${{ matrix.charm }}
       create-git-tags: false
     secrets:
       charmhub-token: ${{ secrets.CHARMCRAFT_CREDENTIALS }}

@@ -34,8 +34,11 @@ jobs:
       uses: actions/setup-python@v5.3.0
       with:
         python-version: 3.8
+
     - name: Install dependencies
-      run: sudo apt-get install python3-pip tox
+      run: |
+        # sudo apt-get install python3-pip tox
+        pip install tox
 
     - name: Lint code
       run: tox -e lint

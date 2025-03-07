@@ -2,6 +2,7 @@
 # See LICENSE file for licensing details.
 
 import base64
+import glob
 import logging
 import shutil
 import time
@@ -116,7 +117,12 @@ async def test_build_and_deploy_dispatcher_charm(ops_test: OpsTest):
         trust=True,
     )
 
-    built_charm_path = await ops_test.build_charm("./")
+    if charm_file := glob.glob(f"./{METADATA['name']}*.charm"):
+        logger.info(f"Using local file {charm_file[0]}")
+        built_charm_path = charm_file[0]
+    else:
+        logger.info(f"Packing charm on ./")
+        built_charm_path = await ops_test.build_charm("./")
     image_path = METADATA["resources"]["oci-image"]["upstream-source"]
     resources = {"oci-image": image_path}
 
@@ -140,7 +146,16 @@ async def test_build_and_deploy_dispatcher_charm(ops_test: OpsTest):
 
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy_helper_charms(ops_test: OpsTest, copy_libraries_into_tester_charm):
-    build_manifests_charm_path = await ops_test.build_charm("./tests/integration/manifests-tester")
+    charm_name = "manifests-tester"
+    if charm_file := glob.glob(f"./tests/integration/manifests-tester/{charm_name}*.charm"):
+        logger.info(f"Using local file {charm_file[0]}")
+        build_manifests_charm_path = charm_file[0]
+    else:
+        logger.info(f"Packing charm on tests/integration/manifests-tester")
+        build_manifests_charm_path = await ops_test.build_charm(
+            "./tests/integration/manifests-tester"
+        )
+
     await ops_test.model.deploy(
         entity_url=build_manifests_charm_path,
         application_name=MANIFEST_CHARM_NAME1,

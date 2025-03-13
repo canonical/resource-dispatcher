@@ -11,7 +11,7 @@ jobs:
 
   lib-check:
     name: Check libraries
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -25,28 +25,38 @@ jobs:
 
   lint:
     name: Lint Check
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
 
     steps:
     - name: Check out code
       uses: actions/checkout@v3
 
+    - name: Set up Python 3.8
+      uses: actions/setup-python@v5.3.0
+      with:
+        python-version: 3.8
+
     - name: Install dependencies
-      run: sudo apt-get install python3-pip tox
+      run: python3 -m pip install tox
 
     - name: Lint code
       run: tox -e lint
 
   unit:
     name: Unit Test
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
 
     steps:
     - name: Check out code
       uses: actions/checkout@v3
 
+    - name: Set up Python 3.8
+      uses: actions/setup-python@v5.3.0
+      with:
+        python-version: 3.8
+
     - name: Install dependencies
-      run: sudo apt-get install python3-pip tox
+      run: python3 -m pip install tox
 
     - name: Run unit tests
       run: tox -e unit
@@ -59,14 +69,19 @@ jobs:
       # Don't run this workflow since the charm goes to `Error` state when deployed on its own
       # See: https://github.com/canonical/resource-dispatcher/issues/66
       apply: false
-      
+
   integration:
     name: Integration Test (build and deploy)
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
 
     steps:
     - name: Check out repo
       uses: actions/checkout@v3
+
+    - name: Set up Python 3.8
+      uses: actions/setup-python@v5.3.0
+      with:
+        python-version: 3.8
 
     - name: Setup operator environment
       uses: charmed-kubernetes/actions-operator@main
@@ -96,7 +111,7 @@ jobs:
     - name: Get operator logs
       run: kubectl logs --tail 100 -ntesting -loperator.juju.is/name=resource-dispatcher
       if: failure()
-    
+
     - name: Setup tmate session
       uses: mxschmitt/action-tmate@v3
       if: failure()

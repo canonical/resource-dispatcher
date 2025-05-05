@@ -117,6 +117,7 @@ class ResourceDispatcherOperator(CharmBase):
                         "main.py "
                         f"--port {self._port} "
                         f"--label {self._namespace_label}"
+                        f"--folder {DISPATCHER_RESOURCES_PATH}"
                     ),
                     "startup": "enabled",
                 }

@@ -11,6 +11,7 @@ import lightkube
 import pytest
 import yaml
 from charmed_kubeflow_chisme.kubernetes import KubernetesResourceHandler
+from charms_depdendencies import METACONTROLLER_OPERATOR
 from lightkube import codecs
 from lightkube.core.exceptions import ApiError
 from lightkube.generic_resource import (
@@ -29,7 +30,6 @@ MANIFESTS_REQUIRER_TESTER_CHARM = Path("tests/integration/manifests-tester").abs
 MANIFESTS_TESTER_CONFIG = yaml.safe_load(
     Path("./tests/integration/manifests-tester/config.yaml").read_text()
 )
-METACONTROLLER_CHARM_NAME = "metacontroller-operator"
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 NAMESPACE_FILE = "./tests/integration/namespace.yaml"
 PODDEFAULTS_CRD_TEMPLATE = "./tests/integration/crds/poddefaults.yaml"
@@ -111,9 +111,9 @@ async def test_build_and_deploy_dispatcher_charm(ops_test: OpsTest):
     deploy_k8s_resources([PODDEFAULTS_CRD_TEMPLATE])
 
     await ops_test.model.deploy(
-        entity_url=METACONTROLLER_CHARM_NAME,
-        channel="latest/edge",
-        trust=True,
+        entity_url=METACONTROLLER_OPERATOR.charm,
+        channel=METACONTROLLER_OPERATOR.channel,
+        trust=METACONTROLLER_OPERATOR.trust,
     )
 
     built_charm_path = await ops_test.build_charm("./")
@@ -128,7 +128,7 @@ async def test_build_and_deploy_dispatcher_charm(ops_test: OpsTest):
     )
 
     await ops_test.model.wait_for_idle(
-        apps=[CHARM_NAME, METACONTROLLER_CHARM_NAME],
+        apps=[CHARM_NAME, METACONTROLLER_OPERATOR.charm],
         status="active",
         raise_on_blocked=False,
         raise_on_error=False,
@@ -163,7 +163,12 @@ async def test_build_and_deploy_helper_charms(ops_test: OpsTest, copy_libraries_
     await ops_test.model.relate(f"{CHARM_NAME}:secrets", f"{MANIFEST_CHARM_NAME2}:secrets")
 
     await ops_test.model.wait_for_idle(
-        apps=[CHARM_NAME, METACONTROLLER_CHARM_NAME, MANIFEST_CHARM_NAME1, MANIFEST_CHARM_NAME2],
+        apps=[
+            CHARM_NAME,
+            METACONTROLLER_OPERATOR.charm,
+            MANIFEST_CHARM_NAME1,
+            MANIFEST_CHARM_NAME2,
+        ],
         status="active",
         raise_on_blocked=False,
         raise_on_error=False,
@@ -206,7 +211,12 @@ async def test_remove_relation(ops_test: OpsTest):
         "remove-relation", f"{CHARM_NAME}:secrets", f"{MANIFEST_CHARM_NAME1}:secrets"
     )
     await ops_test.model.wait_for_idle(
-        apps=[CHARM_NAME, METACONTROLLER_CHARM_NAME, MANIFEST_CHARM_NAME1, MANIFEST_CHARM_NAME2],
+        apps=[
+            CHARM_NAME,
+            METACONTROLLER_OPERATOR.charm,
+            MANIFEST_CHARM_NAME1,
+            MANIFEST_CHARM_NAME2,
+        ],
         status="active",
         raise_on_blocked=False,
         raise_on_error=False,

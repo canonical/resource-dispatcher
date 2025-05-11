@@ -10,13 +10,21 @@ certifi==2025.4.26
     # via requests
 charset-normalizer==3.4.2
     # via requests
+deprecated==1.2.18
+    # via opentelemetry-api
 idna==3.10
     # via requests
+importlib-metadata==8.5.0
+    # via
+    #   opentelemetry-api
+    #   ops
 importlib-resources==6.4.5
     # via jsonschema
 jsonschema==4.17.3
     # via serialized-data-interface
-ops==2.17.1
+opentelemetry-api==1.33.0
+    # via ops
+ops==2.21.1
     # via
     #   -r requirements.in
     #   serialized-data-interface
@@ -37,5 +45,9 @@ urllib3==2.2.3
     # via requests
 websocket-client==1.8.0
     # via ops
+wrapt==1.17.2
+    # via deprecated
 zipp==3.20.2
-    # via importlib-resources
+    # via
+    #   importlib-metadata
+    #   importlib-resources

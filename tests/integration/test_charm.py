@@ -11,7 +11,7 @@ import lightkube
 import pytest
 import yaml
 from charmed_kubeflow_chisme.kubernetes import KubernetesResourceHandler
-from charms_depdendencies import METACONTROLLER_OPERATOR
+from charms_dependencies import METACONTROLLER_OPERATOR
 from lightkube import codecs
 from lightkube.core.exceptions import ApiError
 from lightkube.generic_resource import (

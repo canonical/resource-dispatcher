@@ -17,8 +17,8 @@ from charms.resource_dispatcher.v0.kubernetes_manifests import (
     KubernetesManifestRequirerWrapper,
     KubernetesManifestsRequirer,
 )
+from ops import main
 from ops.charm import CharmBase
-from ops.main import main
 from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
 
 logger = logging.getLogger(__name__)

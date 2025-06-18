@@ -38,8 +38,6 @@ parts:
     after:
       - python-deps
     python-requirements: [requirements.txt]
-    build-environment:
-      - PIP_CONSTRAINT: constraints.txt
     override-build: |
       craftctl default
       # Include requirements.txt in *.charm artifact for easier debugging

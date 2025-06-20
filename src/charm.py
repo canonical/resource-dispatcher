@@ -14,9 +14,9 @@ from charms.resource_dispatcher.v0.kubernetes_manifests import KubernetesManifes
 from lightkube import ApiError
 from lightkube.generic_resource import load_in_cluster_generic_resources
 from lightkube.models.core_v1 import ServicePort
+from ops import main
 from ops.charm import CharmBase
 from ops.framework import EventBase
-from ops.main import main
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus
 from ops.pebble import APIError, ChangeError, Layer
 

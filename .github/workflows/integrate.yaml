@@ -11,10 +11,10 @@ jobs:
 
   lib-check:
     name: Check libraries
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - name: Check libs
@@ -25,28 +25,28 @@ jobs:
 
   lint:
     name: Lint Check
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
 
     steps:
     - name: Check out code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Install dependencies
-      run: sudo apt-get install python3-pip tox
+      run: python3 -m pip install tox
 
     - name: Lint code
       run: tox -e lint
 
   unit:
     name: Unit Test
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
 
     steps:
     - name: Check out code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Install dependencies
-      run: sudo apt-get install python3-pip tox
+      run: python3 -m pip install tox
 
     - name: Run unit tests
       run: tox -e unit
@@ -60,26 +60,20 @@ jobs:
       # Don't run this workflow since the charm goes to `Error` state when deployed on its own
       # See: https://github.com/canonical/resource-dispatcher/issues/66
       apply: false
-      
+
   integration:
     name: Integration Test (build and deploy)
-    runs-on: ubuntu-20.04
-    strategy:
-      matrix:
-        # We test with the highest supported version on every supported release
-        microk8s-versions:
-          - 1.29-strict/stable
-          - 1.31-strict/stable
+    runs-on: ubuntu-24.04
 
     steps:
     - name: Check out repo
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Setup operator environment
       uses: charmed-kubernetes/actions-operator@main
       with:
         provider: microk8s
-        channel: ${{ matrix.microk8s-versions }}
+        channel: 1.32-strict/stable
         juju-channel: 3.6/stable
         microk8s-addons: "dns storage rbac metallb:10.64.140.43-10.64.140.49"
         charmcraft-channel: 3.x/stable
@@ -103,7 +97,7 @@ jobs:
     - name: Get operator logs
       run: kubectl logs --tail 100 -ntesting -loperator.juju.is/name=resource-dispatcher
       if: failure()
-    
+
     - name: Setup tmate session
       uses: mxschmitt/action-tmate@v3
       if: failure()

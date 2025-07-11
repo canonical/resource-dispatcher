@@ -32,7 +32,7 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Install dependencies
-      run: python3 -m pip install tox
+      run: python3 -m pipx install tox
 
     - name: Lint code
       run: tox -e lint
@@ -46,7 +46,7 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Install dependencies
-      run: python3 -m pip install tox
+      run: python3 -m pipx install tox
 
     - name: Run unit tests
       run: tox -e unit

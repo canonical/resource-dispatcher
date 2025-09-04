@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
       - name: Check libs
@@ -29,7 +29,7 @@ jobs:
 
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Install dependencies
       run: python3 -m pipx install tox
@@ -43,7 +43,7 @@ jobs:
 
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Install dependencies
       run: python3 -m pipx install tox
@@ -66,7 +66,7 @@ jobs:
 
     steps:
     - name: Check out repo
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
     - name: Install dependencies
       run: pipx install tox
 

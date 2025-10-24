@@ -1,6 +1,7 @@
 resource "juju_application" "resource_dispatcher" {
   charm {
     name     = "resource-dispatcher"
+    base     = var.base
     channel  = var.channel
     revision = var.revision
   }

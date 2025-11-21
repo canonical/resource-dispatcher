@@ -26,6 +26,8 @@ logger = logging.getLogger(__name__)
 PODDEFAULTS_RELATION_NAME = "pod-defaults"
 SECRETS_RELATION_NAME = "secrets"
 SERVICEACCOUNTS_RELATION_NAME = "service-accounts"
+ROLES_RELATION_NAME = "roles"
+ROLEBINDINGS_RELATION_NAME = "role-bindings"
 
 SERVICE_ACCOUNT_YAML = """
 apiVersion: v1
@@ -66,6 +68,18 @@ class ManifestsTesterCharm(CharmBase):
             manifests_items=self._secrets_manifests,
         )
 
+        self._roles_manifests_requirer = KubernetesManifestsRequirer(
+            charm=self,
+            relation_name=ROLES_RELATION_NAME,
+            manifests_items=self._roles_manifests,
+        )
+
+        self._rolebindings_manifests_requirer = KubernetesManifestsRequirer(
+            charm=self,
+            relation_name=ROLEBINDINGS_RELATION_NAME,
+            manifests_items=self._rolebindings_manifests,
+        )
+
         self.service_accounts_requirer_wrapper = KubernetesManifestRequirerWrapper(
             charm=self, relation_name=SERVICEACCOUNTS_RELATION_NAME
         )
@@ -77,6 +91,14 @@ class ManifestsTesterCharm(CharmBase):
     @property
     def _secrets_manifests(self):
         return self._get_manifests(SECRETS_RELATION_NAME, self._manifests_folder)
+
+    @property
+    def _roles_manifests(self):
+        return self._get_manifests(ROLES_RELATION_NAME, self._manifests_folder)
+
+    @property
+    def _rolebindings_manifests(self):
+        return self._get_manifests(ROLEBINDINGS_RELATION_NAME, self._manifests_folder)
 
     def _get_manifests(self, resource_type, folder) -> List[KubernetesManifest]:
         manifests = []

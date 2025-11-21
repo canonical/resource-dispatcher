@@ -14,11 +14,15 @@ resources:
   oci-image:
     type: oci-image
     description: Backing OCI image
-    upstream-source: charmedkubeflow/resource-dispatcher:2.0-e85408a
+    upstream-source: bikalpadhakalcanonical/resource-dispatcher:2
 provides:
   secrets:
     interface: kubernetes_manifest
   service-accounts:
     interface: kubernetes_manifest
   pod-defaults:
+    interface: kubernetes_manifest
+  roles:
+    interface: kubernetes_manifest
+  role-bindings:
     interface: kubernetes_manifest

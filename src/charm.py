@@ -25,6 +25,8 @@ DISPATCHER_RESOURCES_PATH = "/var/lib/pebble/default/resources"  # NOTE: in Pebb
 PODDEFAULTS_RELATION_NAME = "pod-defaults"
 SECRETS_RELATION_NAME = "secrets"
 SERVICEACCOUNTS_RELATION_NAME = "service-accounts"
+ROLES_RELATION_NAME = "roles"
+ROLEBINDINGS_RELATION_NAME = "role-bindings"
 
 
 class ResourceDispatcherOperator(CharmBase):
@@ -77,11 +79,18 @@ class ResourceDispatcherOperator(CharmBase):
         self._serviceaccounts_manifests_provider = KubernetesManifestsProvider(
             charm=self, relation_name=SERVICEACCOUNTS_RELATION_NAME
         )
-
+        self._roles_manifests_provider = KubernetesManifestsProvider(
+            charm=self, relation_name=ROLES_RELATION_NAME
+        )
+        self._rolebindings_manifests_provider = KubernetesManifestsProvider(
+            charm=self, relation_name=ROLEBINDINGS_RELATION_NAME
+        )
         for provider in [
             self._poddefaults_manifests_provider,
             self._secrets_manifests_provider,
             self._serviceaccounts_manifests_provider,
+            self._roles_manifests_provider,
+            self._rolebindings_manifests_provider,
         ]:
             self.framework.observe(provider.on.updated, self._on_event)
 
@@ -264,6 +273,14 @@ class ResourceDispatcherOperator(CharmBase):
             self._update_manifests(
                 self._poddefaults_manifests_provider,
                 f"{DISPATCHER_RESOURCES_PATH}/{PODDEFAULTS_RELATION_NAME}",
+            )
+            self._update_manifests(
+                self._roles_manifests_provider,
+                f"{DISPATCHER_RESOURCES_PATH}/{ROLES_RELATION_NAME}",
+            )
+            self._update_manifests(
+                self._rolebindings_manifests_provider,
+                f"{DISPATCHER_RESOURCES_PATH}/{ROLEBINDINGS_RELATION_NAME}",
             )
         except ErrorWithStatus as err:
             self.model.unit.status = err.status

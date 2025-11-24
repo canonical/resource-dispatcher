@@ -119,7 +119,6 @@ async def test_build_and_deploy_dispatcher_charm(ops_test: OpsTest):
         entity_url=METACONTROLLER_OPERATOR.charm,
         channel=METACONTROLLER_OPERATOR.channel,
         trust=METACONTROLLER_OPERATOR.trust,
-        revision=545,  # TODO: Remove this pinning once the charm gets released
     )
 
     built_charm_path = await ops_test.build_charm("./")

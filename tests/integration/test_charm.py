@@ -19,6 +19,7 @@ from lightkube.generic_resource import (
     load_in_cluster_generic_resources,
 )
 from lightkube.resources.core_v1 import Secret, ServiceAccount
+from lightkube.resources.rbac_authorization_v1 import Role, RoleBinding
 from pytest_operator.plugin import OpsTest
 
 logger = logging.getLogger(__name__)
@@ -39,6 +40,10 @@ SERVICE_ACCOUNT_NAME = MANIFESTS_TESTER_CONFIG["options"]["service_account_name"
 TESTER1_SECRET_NAMES = ["mlpipeline-minio-artifact", "seldon-rclone-secret"]
 TESTER2_SECRET_NAMES = ["mlpipeline-minio-artifact2", "seldon-rclone-secret2"]
 PODDEFAULTS_NAMES = ["access-minio", "mlflow-server-minio"]
+TESTER1_ROLE_NAMES = ["test1-role"]
+TESTER2_ROLE_NAMES = ["test2-role"]
+TESTER1_ROLEBINDING_NAMES = ["test1-rolebinding"]
+TESTER2_ROLEBINDING_NAMES = ["test2-rolebinding"]
 
 PodDefault = create_namespaced_resource("kubeflow.org", "v1alpha1", "PodDefault", "poddefaults")
 
@@ -160,7 +165,16 @@ async def test_build_and_deploy_helper_charms(ops_test: OpsTest, copy_libraries_
     await ops_test.model.relate(
         f"{CHARM_NAME}:pod-defaults", f"{MANIFEST_CHARM_NAME1}:pod-defaults"
     )
+    await ops_test.model.relate(f"{CHARM_NAME}:roles", f"{MANIFEST_CHARM_NAME1}:roles")
+    await ops_test.model.relate(
+        f"{CHARM_NAME}:role-bindings", f"{MANIFEST_CHARM_NAME1}:role-bindings"
+    )
+
     await ops_test.model.relate(f"{CHARM_NAME}:secrets", f"{MANIFEST_CHARM_NAME2}:secrets")
+    await ops_test.model.relate(f"{CHARM_NAME}:roles", f"{MANIFEST_CHARM_NAME2}:roles")
+    await ops_test.model.relate(
+        f"{CHARM_NAME}:role-bindings", f"{MANIFEST_CHARM_NAME2}:role-bindings"
+    )
 
     await ops_test.model.wait_for_idle(
         apps=[
@@ -202,6 +216,12 @@ async def test_manifests_created_from_both_helpers(
     for name in PODDEFAULTS_NAMES:
         pod_default = lightkube_client.get(PodDefault, name, namespace=namespace)
         assert pod_default != None
+    for name in TESTER1_ROLE_NAMES + TESTER2_ROLE_NAMES:
+        role = lightkube_client.get(Role, name, namespace=namespace)
+        assert role != None
+    for name in TESTER1_ROLEBINDING_NAMES + TESTER2_ROLEBINDING_NAMES:
+        rb = lightkube_client.get(RoleBinding, name, namespace=namespace)
+        assert rb != None
 
 
 @pytest.mark.abort_on_fail
@@ -209,6 +229,10 @@ async def test_remove_relation(ops_test: OpsTest):
     """Make sure that charm goes to active state after relation is removed"""
     await ops_test.juju(
         "remove-relation", f"{CHARM_NAME}:secrets", f"{MANIFEST_CHARM_NAME1}:secrets"
+    )
+    await ops_test.juju("remove-relation", f"{CHARM_NAME}:roles", f"{MANIFEST_CHARM_NAME1}:roles")
+    await ops_test.juju(
+        "remove-relation", f"{CHARM_NAME}:role-bindings", f"{MANIFEST_CHARM_NAME1}:role-bindings"
     )
     await ops_test.model.wait_for_idle(
         apps=[
@@ -235,7 +259,21 @@ async def test_remove_one_helper_relation(
     for name in TESTER2_SECRET_NAMES:
         secret = lightkube_client.get(Secret, name, namespace=namespace)
         assert secret != None
+    for name in TESTER2_ROLE_NAMES:
+        role = lightkube_client.get(Role, name, namespace=namespace)
+        assert role != None
+    for name in TESTER2_ROLEBINDING_NAMES:
+        rolebinding = lightkube_client.get(RoleBinding, name, namespace=namespace)
+        assert rolebinding != None
     for name in TESTER1_SECRET_NAMES:
         with pytest.raises(ApiError) as e_info:
             secret = lightkube_client.get(Secret, name, namespace=namespace)
+        assert "not found" in str(e_info)
+    for name in TESTER1_ROLE_NAMES:
+        with pytest.raises(ApiError) as e_info:
+            role = lightkube_client.get(Role, name, namespace=namespace)
+        assert "not found" in str(e_info)
+    for name in TESTER1_ROLEBINDING_NAMES:
+        with pytest.raises(ApiError) as e_info:
+            rolebinding = lightkube_client.get(RoleBinding, name, namespace=namespace)
         assert "not found" in str(e_info)

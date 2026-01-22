@@ -1,0 +1,18 @@
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
+name: manifests-tester
+summary: |
+  Charm for sending manifests to ResourceDispatcher relations.
+description: |
+  Charm for sending manifests to ResourceDispatcher relations.
+requires:
+  secrets:
+    interface: kubernetes_manifest
+  service-accounts:
+    interface: kubernetes_manifest
+  pod-defaults:
+    interface: kubernetes_manifest
+  roles:
+    interface: kubernetes_manifest
+  role-bindings:
+    interface: kubernetes_manifest

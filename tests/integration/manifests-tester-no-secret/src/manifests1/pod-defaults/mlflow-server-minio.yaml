@@ -1,0 +1,14 @@
+apiVersion: kubeflow.org/v1alpha1
+kind: PodDefault
+metadata:
+  name: mlflow-server-minio
+spec:
+  desc: Allow access to MLFlow
+  env:
+  - name: MLFLOW_S3_ENDPOINT_URL
+    value: http://minio.kubeflow:9000
+  - name: MLFLOW_TRACKING_URI
+    value: http://mlflow-server.kubeflow.svc.cluster.local:5000
+  selector:
+    matchLabels:
+      mlflow-server-minio: "true"

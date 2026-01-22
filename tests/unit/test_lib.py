@@ -1,3 +1,5 @@
+"""Test module for the kubernetes_manifests charm lib."""
+
 import json
 from contextlib import nullcontext as does_not_raise
 from dataclasses import asdict
@@ -172,7 +174,7 @@ class TestKubernetesManifest:
             KubernetesManifest(manifest)
 
 
-class TestManifestsProvder:
+class TestManifestsProvider:
     def test_get_manifests(self):
         """Tests that get_manifests correctly returns information from the relation."""
         # Arrange
@@ -186,7 +188,6 @@ class TestManifestsProvder:
                 [manifest_item.manifest for manifest_item in RELATION1_MANIFESTS]
             )
         }
-
         other_databag = {
             KUBERNETES_MANIFESTS_FIELD: json.dumps(
                 [manifest_item.manifest for manifest_item in RELATION2_MANIFESTS]
@@ -210,6 +211,56 @@ class TestManifestsProvder:
         ]
 
         harness.begin()
+
+        # Act
+        # Get manifests from relation data
+        actual_manifests = harness.charm.manifests_provider.get_manifests()
+
+        # Assert
+        assert actual_manifests == expected_manifests
+
+    def test_get_manifests_new_lib(self):
+        """Tests that get_manifests correctly returns information from the relation, in the new lib with secret support."""
+        # Arrange
+        # Set up charm
+        other_app = "other"
+        harness = Harness(DummyProviderCharm, meta=DUMMY_PROVIDER_METADATA)
+        manifest1_content = {
+            "manifests": json.dumps(
+                [manifest_item.manifest for manifest_item in RELATION1_MANIFESTS]
+            )
+        }
+        manifest2_content = {
+            "manifests": json.dumps(
+                [manifest_item.manifest for manifest_item in RELATION2_MANIFESTS]
+            )
+        }
+        secret1_id = harness.add_model_secret(other_app, content=manifest1_content)
+        secret2_id = harness.add_model_secret(other_app, content=manifest2_content)
+
+        # Create data
+        databag = {KUBERNETES_MANIFESTS_FIELD: secret1_id, "is-secret": "true"}
+        other_databag = {KUBERNETES_MANIFESTS_FIELD: secret2_id, "is-secret": "true"}
+
+        # Add data to relation
+        harness.add_relation(SERVICE_ACCOUNTS_RELATION, other_app, app_data=databag)
+
+        # Add to a second relation so we simulate having two relations of data
+        harness.add_relation(SERVICE_ACCOUNTS_RELATION, other_app, app_data=other_databag)
+
+        harness.begin()
+        harness.grant_secret(secret1_id, harness.charm.app.name)
+        harness.grant_secret(secret2_id, harness.charm.app.name)
+
+        expected_manifests = [
+            yaml.safe_load(content)
+            for content in [
+                MANIFEST_CONTENT1,
+                MANIFEST_CONTENT2,
+                MANIFEST_CONTENT3,
+                MANIFEST_CONTENT4,
+            ]
+        ]
 
         # Act
         # Get manifests from relation data
@@ -400,8 +451,10 @@ class TestManifestsRequirer:
         assert actual_manifests == [yaml.safe_load(SECRET_YAML.format(name=updated_secret_name))]
 
 
-def get_manifests_from_relation(harness, relation_id, this_app) -> List[dict]:
+def get_manifests_from_relation(harness: Harness, relation_id, this_app) -> List[dict]:
     """Returns the list of KubernetesManifests from a service-account relation on a harness."""
     raw_relation_data = harness.get_relation_data(relation_id=relation_id, app_or_unit=this_app)
-    actual_manifests = json.loads(raw_relation_data[KUBERNETES_MANIFESTS_FIELD])
+    secret_id = raw_relation_data[KUBERNETES_MANIFESTS_FIELD]
+    manifest_dump = harness.model.get_secret(id=secret_id).get_content(refresh=True)
+    actual_manifests = json.loads(manifest_dump["manifests"])
     return actual_manifests

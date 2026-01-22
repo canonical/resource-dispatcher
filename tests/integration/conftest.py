@@ -17,6 +17,7 @@ from lightkube import codecs
 from .helpers import delete_all_from_yaml, safe_load_file_to_text
 
 logger = logging.getLogger(__name__)
+logging.getLogger("jubilant.wait").setLevel(logging.WARNING)
 
 
 RESOURCE_DISPATCHER_CHARM_NAME = "resource-dispatcher"
@@ -29,12 +30,24 @@ NAMESPACE_MANIFEST_FILE = "./tests/integration/namespace.yaml"
 TESTING_LABELS = ["user.kubeflow.org/enabled"]  # Might be more than one in the future
 
 
+def pytest_addoption(parser):
+    parser.addoption(
+        "--keep-models",
+        action="store_true",
+        default=False,
+        help="keep temporarily-created models",
+    )
+
+
 @pytest.fixture(scope="module")
 def resource_dispatcher_charm() -> Path:
     """Path to the packed resource-dispatcher charm."""
-    if not (path := next(iter(Path.cwd().glob("*.charm")), None)):
-        raise FileNotFoundError("Could not find packed resource-dispatcher charm.")
-
+    charm_path = Path.cwd()
+    if not (path := next(iter(charm_path.glob("*.charm")), None)):
+        logger.warning("Could not find packed resource-dispatcher charm. Building one now...")
+        subprocess.run(["charmcraft", "pack"], check=True, cwd=charm_path)
+    if not (path := next(iter(charm_path.glob("*.charm")), None)):
+        raise FileNotFoundError("Could neither find, nor build the resource-dispatcher charm.")
     return path
 
 

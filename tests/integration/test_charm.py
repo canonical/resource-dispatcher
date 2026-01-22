@@ -10,12 +10,12 @@ import jubilant
 import lightkube
 import pytest
 import yaml
-from charms_dependencies import METACONTROLLER_OPERATOR
 from lightkube.core.exceptions import ApiError
 from lightkube.generic_resource import create_namespaced_resource
 from lightkube.resources.core_v1 import Secret, ServiceAccount
 from lightkube.resources.rbac_authorization_v1 import Role, RoleBinding
 
+from .charms_dependencies import METACONTROLLER_OPERATOR
 from .helpers import deploy_k8s_resources
 
 logger = logging.getLogger(__name__)
@@ -66,7 +66,7 @@ def test_build_and_deploy_dispatcher_charm(juju: jubilant.Juju, resource_dispatc
     status = juju.wait(
         lambda status: jubilant.all_active(status) and jubilant.all_agents_idle(status), delay=5
     )
-    assert status.apps[CHARM_NAME].units[0].workload_status == "active"
+    assert status.apps[CHARM_NAME].units[f"{CHARM_NAME}/0"].workload_status.current == "active"
 
 
 @pytest.mark.abort_on_fail
@@ -96,7 +96,7 @@ def test_build_and_deploy_helper_charms(juju: jubilant.Juju, manifest_tester_cha
     status = juju.wait(
         lambda status: jubilant.all_active(status) and jubilant.all_agents_idle(status), delay=5
     )
-    assert status.apps[CHARM_NAME].units[0].workload_status == "active"
+    assert status.apps[CHARM_NAME].units[f"{CHARM_NAME}/0"].workload_status.current == "active"
 
 
 @pytest.mark.abort_on_fail

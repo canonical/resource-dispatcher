@@ -14,7 +14,7 @@ import pytest
 import yaml
 from lightkube import codecs
 
-from .helpers import delete_all_from_yaml, safe_load_file_to_text
+from .helpers import delete_all_from_yaml, get_or_build_charm, safe_load_file_to_text
 
 logger = logging.getLogger(__name__)
 logging.getLogger("jubilant.wait").setLevel(logging.WARNING)
@@ -42,25 +42,19 @@ def pytest_addoption(parser):
 @pytest.fixture(scope="module")
 def resource_dispatcher_charm() -> Path:
     """Path to the packed resource-dispatcher charm."""
-    charm_path = Path.cwd()
-    if not (path := next(iter(charm_path.glob("*.charm")), None)):
-        logger.warning("Could not find packed resource-dispatcher charm. Building one now...")
-        subprocess.run(["charmcraft", "pack"], check=True, cwd=charm_path)
-    if not (path := next(iter(charm_path.glob("*.charm")), None)):
-        raise FileNotFoundError("Could neither find, nor build the resource-dispatcher charm.")
-    return path
+    return get_or_build_charm(
+        Path.cwd(),
+        name="resource-dispatcher",
+    )
 
 
 @pytest.fixture(scope="module")
 def manifest_tester_charm() -> Path:
     """Path to the packed manifest-tester charm with new lib that supports secrets."""
-    charm_path = Path.cwd() / "tests/integration/manifests-tester"
-    if not (path := next(iter(charm_path.glob("*.charm")), None)):
-        logger.warning("Could not find packed manifest-tester charm. Building one now...")
-        subprocess.run(["charmcraft", "pack"], check=True, cwd=charm_path)
-    if not (path := next(iter(charm_path.glob("*.charm")), None)):
-        raise FileNotFoundError("Could neither find, nor build the manifest-tester charm.")
-    return path
+    return get_or_build_charm(
+        Path.cwd() / "tests/integration/manifests-tester",
+        name="manifest-tester",
+    )
 
 
 @pytest.fixture(scope="module", autouse=True)

@@ -2,6 +2,7 @@
 # See LICENSE file for licensing details.
 
 import logging
+import subprocess
 from pathlib import Path
 
 import lightkube
@@ -48,3 +49,14 @@ def deploy_k8s_resources(template_files: str):
     )
     load_in_cluster_generic_resources(lightkube_client)
     k8s_resource_handler.apply()
+
+
+def get_or_build_charm(charm_path: Path, name: str) -> Path:
+    if not (path := next(charm_path.glob("*.charm"), None)):
+        logger.warning("Could not find packed %s charm. Building one now...", name)
+        subprocess.run(["charmcraft", "pack"], check=True, cwd=charm_path)
+
+    if not (path := next(charm_path.glob("*.charm"), None)):
+        raise FileNotFoundError(f"Could neither find, nor build the {name} charm.")
+
+    return path

@@ -3,23 +3,20 @@
 
 import base64
 import logging
-import shutil
 import time
 from pathlib import Path
 
+import jubilant
 import lightkube
 import pytest
 import yaml
-from charmed_kubeflow_chisme.kubernetes import KubernetesResourceHandler
-from charms_dependencies import METACONTROLLER_OPERATOR
-from lightkube import codecs
 from lightkube.core.exceptions import ApiError
-from lightkube.generic_resource import (
-    create_namespaced_resource,
-    load_in_cluster_generic_resources,
-)
+from lightkube.generic_resource import create_namespaced_resource
 from lightkube.resources.core_v1 import Secret, ServiceAccount
-from pytest_operator.plugin import OpsTest
+from lightkube.resources.rbac_authorization_v1 import Role, RoleBinding
+
+from .charms_dependencies import METACONTROLLER_OPERATOR
+from .helpers import deploy_k8s_resources
 
 logger = logging.getLogger(__name__)
 
@@ -43,142 +40,56 @@ PODDEFAULTS_NAMES = ["access-minio", "mlflow-server-minio"]
 PodDefault = create_namespaced_resource("kubeflow.org", "v1alpha1", "PodDefault", "poddefaults")
 
 
-@pytest.fixture(scope="module")
-def copy_libraries_into_tester_charm() -> None:
-    """Ensure that the tester charms use the current libraries."""
-    lib = Path("lib/charms/resource_dispatcher/v0/kubernetes_manifests.py")
-    Path(MANIFESTS_REQUIRER_TESTER_CHARM, lib.parent).mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(lib.as_posix(), (MANIFESTS_REQUIRER_TESTER_CHARM / lib).as_posix())
-
-
-def _safe_load_file_to_text(filename: str) -> str:
-    """Returns the contents of filename if it is an existing file, else it returns filename."""
-    try:
-        text = Path(filename).read_text()
-    except FileNotFoundError:
-        text = filename
-    return text
-
-
-def delete_all_from_yaml(yaml_text: str, lightkube_client: lightkube.Client = None):
-    """Deletes all k8s resources listed in a YAML file via lightkube.
-
-    Args:
-        yaml_file (str or Path): Either a string filename or a string of valid YAML.  Will attempt
-                                 to open a filename at this path, failing back to interpreting the
-                                 string directly as YAML.
-        lightkube_client: Instantiated lightkube client or None
-    """
-
-    if lightkube_client is None:
-        lightkube_client = lightkube.Client()
-
-    for obj in codecs.load_all_yaml(yaml_text):
-        lightkube_client.delete(type(obj), obj.metadata.name)
-
-
-@pytest.fixture(scope="session")
-def lightkube_client() -> lightkube.Client:
-    client = lightkube.Client(field_manager=CHARM_NAME)
-    return client
-
-
-def deploy_k8s_resources(template_files: str):
-    lightkube_client = lightkube.Client(field_manager=CHARM_NAME)
-    k8s_resource_handler = KubernetesResourceHandler(
-        field_manager=CHARM_NAME, template_files=template_files, context={}
-    )
-    load_in_cluster_generic_resources(lightkube_client)
-    k8s_resource_handler.apply()
-
-
-@pytest.fixture(scope="function")
-def namespace(lightkube_client: lightkube.Client):
-    yaml_text = _safe_load_file_to_text(NAMESPACE_FILE)
-    yaml_rendered = yaml.safe_load(yaml_text)
-    for label in TESTING_LABELS:
-        yaml_rendered["metadata"]["labels"][label] = "true"
-    obj = codecs.from_dict(yaml_rendered)
-    lightkube_client.apply(obj)
-
-    yield obj.metadata.name
-
-    delete_all_from_yaml(yaml_text, lightkube_client)
-
-
-@pytest.mark.abort_on_fail
-async def test_build_and_deploy_dispatcher_charm(ops_test: OpsTest):
+def test_build_and_deploy_dispatcher_charm(juju: jubilant.Juju, resource_dispatcher_charm: Path):
     deploy_k8s_resources([PODDEFAULTS_CRD_TEMPLATE])
 
-    await ops_test.model.deploy(
-        entity_url=METACONTROLLER_OPERATOR.charm,
+    juju.deploy(
+        charm=METACONTROLLER_OPERATOR.charm,
         channel=METACONTROLLER_OPERATOR.channel,
         trust=METACONTROLLER_OPERATOR.trust,
     )
 
-    built_charm_path = await ops_test.build_charm("./")
     image_path = METADATA["resources"]["oci-image"]["upstream-source"]
     resources = {"oci-image": image_path}
 
-    await ops_test.model.deploy(
-        entity_url=built_charm_path,
-        application_name=CHARM_NAME,
+    juju.deploy(
+        charm=resource_dispatcher_charm,
+        app=CHARM_NAME,
         resources=resources,
         trust=True,
     )
-
-    await ops_test.model.wait_for_idle(
-        apps=[CHARM_NAME, METACONTROLLER_OPERATOR.charm],
-        status="active",
-        raise_on_blocked=False,
-        raise_on_error=False,
-        timeout=300,
+    status = juju.wait(
+        lambda status: jubilant.all_active(status) and jubilant.all_agents_idle(status), delay=5
     )
+    assert status.apps[CHARM_NAME].units[f"{CHARM_NAME}/0"].workload_status.current == "active"
 
-    assert ops_test.model.applications[CHARM_NAME].units[0].workload_status == "active"
 
-
-@pytest.mark.abort_on_fail
-async def test_build_and_deploy_helper_charms(ops_test: OpsTest, copy_libraries_into_tester_charm):
-    build_manifests_charm_path = await ops_test.build_charm("./tests/integration/manifests-tester")
-    await ops_test.model.deploy(
-        entity_url=build_manifests_charm_path,
-        application_name=MANIFEST_CHARM_NAME1,
+def test_build_and_deploy_helper_charms(juju: jubilant.Juju, manifest_tester_charm: Path):
+    juju.deploy(
+        charm=manifest_tester_charm,
+        app=MANIFEST_CHARM_NAME1,
         trust=True,
     )
-    await ops_test.model.deploy(
-        entity_url=build_manifests_charm_path,
-        application_name=MANIFEST_CHARM_NAME2,
+    juju.deploy(
+        charm=manifest_tester_charm,
+        app=MANIFEST_CHARM_NAME2,
         trust=True,
         config={"manifests_folder": "src/manifests2", "service_account_name": "config-secret-2"},
     )
 
-    await ops_test.model.relate(f"{CHARM_NAME}:secrets", f"{MANIFEST_CHARM_NAME1}:secrets")
-    await ops_test.model.relate(
-        f"{CHARM_NAME}:service-accounts", f"{MANIFEST_CHARM_NAME1}:service-accounts"
-    )
-    await ops_test.model.relate(
-        f"{CHARM_NAME}:pod-defaults", f"{MANIFEST_CHARM_NAME1}:pod-defaults"
-    )
-    await ops_test.model.relate(f"{CHARM_NAME}:secrets", f"{MANIFEST_CHARM_NAME2}:secrets")
+    juju.integrate(f"{CHARM_NAME}:secrets", f"{MANIFEST_CHARM_NAME1}:secrets")
+    juju.integrate(f"{CHARM_NAME}:service-accounts", f"{MANIFEST_CHARM_NAME1}:service-accounts")
+    juju.integrate(f"{CHARM_NAME}:pod-defaults", f"{MANIFEST_CHARM_NAME1}:pod-defaults")
 
-    await ops_test.model.wait_for_idle(
-        apps=[
-            CHARM_NAME,
-            METACONTROLLER_OPERATOR.charm,
-            MANIFEST_CHARM_NAME1,
-            MANIFEST_CHARM_NAME2,
-        ],
-        status="active",
-        raise_on_blocked=False,
-        raise_on_error=False,
-        timeout=300,
+    juju.integrate(f"{CHARM_NAME}:secrets", f"{MANIFEST_CHARM_NAME2}:secrets")
+
+    status = juju.wait(
+        lambda status: jubilant.all_active(status) and jubilant.all_agents_idle(status), delay=5
     )
-    assert ops_test.model.applications[CHARM_NAME].units[0].workload_status == "active"
+    assert status.apps[CHARM_NAME].units[f"{CHARM_NAME}/0"].workload_status.current == "active"
 
 
-@pytest.mark.abort_on_fail
-async def test_manifests_created_from_both_helpers(
+def test_manifests_created_from_both_helpers(
     lightkube_client: lightkube.Client, namespace: str
 ) -> None:
     time.sleep(
@@ -204,31 +115,15 @@ async def test_manifests_created_from_both_helpers(
         assert pod_default != None
 
 
-@pytest.mark.abort_on_fail
-async def test_remove_relation(ops_test: OpsTest):
+def test_remove_relation(juju: jubilant.Juju):
     """Make sure that charm goes to active state after relation is removed"""
-    await ops_test.juju(
-        "remove-relation", f"{CHARM_NAME}:secrets", f"{MANIFEST_CHARM_NAME1}:secrets"
-    )
-    await ops_test.model.wait_for_idle(
-        apps=[
-            CHARM_NAME,
-            METACONTROLLER_OPERATOR.charm,
-            MANIFEST_CHARM_NAME1,
-            MANIFEST_CHARM_NAME2,
-        ],
-        status="active",
-        raise_on_blocked=False,
-        raise_on_error=False,
-        timeout=300,
-        idle_period=30,
+    juju.remove_relation(f"{CHARM_NAME}:secrets", f"{MANIFEST_CHARM_NAME1}:secrets")
+    juju.wait(
+        lambda status: jubilant.all_active(status) and jubilant.all_agents_idle(status), delay=5
     )
 
 
-@pytest.mark.abort_on_fail
-async def test_remove_one_helper_relation(
-    ops_test: OpsTest, lightkube_client: lightkube.Client, namespace: str
-):
+def test_remove_one_helper_relation(lightkube_client: lightkube.Client, namespace: str):
     time.sleep(
         30
     )  # sync can take up to 10 seconds for reconciliation loop to trigger (+ time to create namespace)

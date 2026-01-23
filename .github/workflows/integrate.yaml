@@ -79,7 +79,7 @@ jobs:
         sudo concierge prepare --trace
 
     - name: Run integration tests
-      run: tox -vve integration -- --model testing
+      run: tox -vve integration
 
     # On failure, capture debugging resources
     - name: Get all

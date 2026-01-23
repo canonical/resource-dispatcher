@@ -44,7 +44,6 @@ TESTER2_ROLEBINDING_NAMES = ["test2-rolebinding"]
 PodDefault = create_namespaced_resource("kubeflow.org", "v1alpha1", "PodDefault", "poddefaults")
 
 
-@pytest.mark.abort_on_fail
 def test_build_and_deploy_dispatcher_charm(juju: jubilant.Juju, resource_dispatcher_charm: Path):
     deploy_k8s_resources([PODDEFAULTS_CRD_TEMPLATE])
 
@@ -69,7 +68,6 @@ def test_build_and_deploy_dispatcher_charm(juju: jubilant.Juju, resource_dispatc
     assert status.apps[CHARM_NAME].units[f"{CHARM_NAME}/0"].workload_status.current == "active"
 
 
-@pytest.mark.abort_on_fail
 def test_build_and_deploy_helper_charms(juju: jubilant.Juju, manifest_tester_charm: Path):
     juju.deploy(
         charm=manifest_tester_charm,
@@ -99,7 +97,6 @@ def test_build_and_deploy_helper_charms(juju: jubilant.Juju, manifest_tester_cha
     assert status.apps[CHARM_NAME].units[f"{CHARM_NAME}/0"].workload_status.current == "active"
 
 
-@pytest.mark.abort_on_fail
 def test_manifests_created_from_both_helpers(
     lightkube_client: lightkube.Client, namespace: str
 ) -> None:
@@ -132,7 +129,6 @@ def test_manifests_created_from_both_helpers(
         assert rb != None
 
 
-@pytest.mark.abort_on_fail
 def test_remove_one_tester_relation(
     juju: jubilant.Juju, lightkube_client: lightkube.Client, namespace: str
 ):

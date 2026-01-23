@@ -199,9 +199,11 @@ class KubernetesManifestsProvider(Object):
         self._relation_name = relation_name
 
         self.framework.observe(
+            self._charm.on.secret_changed, self._on_secret_changed_event
+        )
+        self.framework.observe(
             self._charm.on[self._relation_name].relation_changed, self._on_relation_changed
         )
-
         self.framework.observe(
             self._charm.on[self._relation_name].relation_broken, self._on_relation_broken
         )
@@ -358,18 +360,18 @@ class KubernetesManifestsRequirer(Object):
         if not event.secret.label:
             return
 
-        relation = self._relation_from_secret_label(event.secret.label)
-
-        if not relation:
-            logging.info(
-                f"Received secret {event.secret.label} but couldn't parse, seems irrelevant"
+        relation_id = parse_relation_id_from_secret_label(event.secret.label)
+        if relation_id is None:
+            logger.info(
+                f"Received secret {event.secret.label} but couldn't parse relation id, seems irrelevant."
             )
             return
 
+        relation = self.model.get_relation(self._relation_name, relation_id)
         if relation.name != self._relation_name:
-            logging.info("Secret changed on wrong relation.")
+            logging.info("Event triggered for some other relation.")
             return
-
+        
         # Ignore the event raised for secret that no longer exists
         # https://github.com/juju/juju/issues/20794
         try:
@@ -379,6 +381,7 @@ class KubernetesManifestsRequirer(Object):
             return
 
         event.remove_revision()
+
 
 
 class KubernetesManifestRequirerWrapper(Object):

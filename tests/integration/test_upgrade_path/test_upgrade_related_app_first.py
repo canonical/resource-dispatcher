@@ -10,13 +10,11 @@ import jubilant
 import lightkube
 import pytest
 import yaml
+from ..helpers import METACONTROLLER_OPERATOR, deploy_k8s_resources
 from lightkube.core.exceptions import ApiError
 from lightkube.generic_resource import create_namespaced_resource
 from lightkube.resources.core_v1 import Secret, ServiceAccount
 from lightkube.resources.rbac_authorization_v1 import Role, RoleBinding
-
-from .charms_dependencies import METACONTROLLER_OPERATOR
-from .helpers import deploy_k8s_resources
 
 logger = logging.getLogger(__name__)
 
@@ -28,8 +26,8 @@ MANIFESTS_TESTER_CONFIG = yaml.safe_load(
     Path("./tests/integration/manifests-tester/config.yaml").read_text()
 )
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
-NAMESPACE_FILE = "./tests/integration/namespace.yaml"
-PODDEFAULTS_CRD_TEMPLATE = "./tests/integration/crds/poddefaults.yaml"
+NAMESPACE_FILE = "./tests/integration/resources/namespace.yaml"
+PODDEFAULTS_CRD_TEMPLATE = "./tests/integration/resources/crds/poddefaults.yaml"
 TESTING_LABELS = ["user.kubeflow.org/enabled"]  # Might be more than one in the future
 SECRET_NAME = "mlpipeline-minio-artifact"
 SERVICE_ACCOUNT_NAME = MANIFESTS_TESTER_CONFIG["options"]["service_account_name"]["default"]
@@ -45,7 +43,8 @@ PodDefault = create_namespaced_resource("kubeflow.org", "v1alpha1", "PodDefault"
 
 
 @pytest.mark.abort_on_fail
-def test_build_and_deploy_dispatcher_charm(juju: jubilant.Juju, resource_dispatcher_charm: Path):
+def test_deploy_metacontroller_setup(juju: jubilant.Juju):
+    """Deploy necessary setup for resource-dispatcher charm to work."""
     deploy_k8s_resources([PODDEFAULTS_CRD_TEMPLATE])
 
     juju.deploy(
@@ -53,14 +52,18 @@ def test_build_and_deploy_dispatcher_charm(juju: jubilant.Juju, resource_dispatc
         channel=METACONTROLLER_OPERATOR.channel,
         trust=METACONTROLLER_OPERATOR.trust,
     )
+    juju.wait(
+        lambda status: jubilant.all_active(status) and jubilant.all_agents_idle(status), delay=5
+    )
 
-    image_path = METADATA["resources"]["oci-image"]["upstream-source"]
-    resources = {"oci-image": image_path}
 
+@pytest.mark.abort_on_fail
+def test_deploy_resource_dispatcher_charm(juju: jubilant.Juju):
+    """Deploy resource-dispatcher charm from 2.0/stable channel, which uses kubernetes_manifest lib 0.1."""
     juju.deploy(
-        charm=resource_dispatcher_charm,
+        charm=CHARM_NAME,
         app=CHARM_NAME,
-        resources=resources,
+        channel="2.0/stable",
         trust=True,
     )
     status = juju.wait(
@@ -70,7 +73,10 @@ def test_build_and_deploy_dispatcher_charm(juju: jubilant.Juju, resource_dispatc
 
 
 @pytest.mark.abort_on_fail
-def test_build_and_deploy_helper_charms(juju: jubilant.Juju, manifest_tester_charm_no_secret: Path):
+def test_build_and_deploy_tester_charms(
+    juju: jubilant.Juju, manifest_tester_charm_no_secret: Path
+):
+    """Deploy manifest-tester charm, that uses kubernetes_manifest lib 0.2."""
     juju.deploy(
         charm=manifest_tester_charm_no_secret,
         app=MANIFEST_CHARM_NAME1,
@@ -82,7 +88,15 @@ def test_build_and_deploy_helper_charms(juju: jubilant.Juju, manifest_tester_cha
         trust=True,
         config={"manifests_folder": "src/manifests2", "service_account_name": "config-secret-2"},
     )
+    status = juju.wait(
+        lambda status: jubilant.all_active(status) and jubilant.all_agents_idle(status), delay=5
+    )
+    assert status.apps[CHARM_NAME].units[f"{CHARM_NAME}/0"].workload_status.current == "active"
 
+
+@pytest.mark.abort_on_fail
+def test_integrate_tester_with_resource_dispatcher(juju: jubilant.Juju):
+    """Integrate manifest-tester charm with resource-dispatcher."""
     juju.integrate(f"{CHARM_NAME}:secrets", f"{MANIFEST_CHARM_NAME1}:secrets")
     juju.integrate(f"{CHARM_NAME}:service-accounts", f"{MANIFEST_CHARM_NAME1}:service-accounts")
     juju.integrate(f"{CHARM_NAME}:pod-defaults", f"{MANIFEST_CHARM_NAME1}:pod-defaults")
@@ -100,9 +114,10 @@ def test_build_and_deploy_helper_charms(juju: jubilant.Juju, manifest_tester_cha
 
 
 @pytest.mark.abort_on_fail
-def test_manifests_created_from_both_helpers(
+def test_manifests_created_from_both_tester_charms(
     lightkube_client: lightkube.Client, namespace: str
 ) -> None:
+    """Ensure that resources from the relation with both instances of manifest-tester charm are created in K8s cluster."""
     time.sleep(
         30
     )  # sync can take up to 10 seconds for reconciliation loop to trigger (+ time to create namespace)
@@ -133,8 +148,10 @@ def test_manifests_created_from_both_helpers(
 
 
 @pytest.mark.abort_on_fail
-def test_remove_relation(juju: jubilant.Juju):
-    """Make sure that charm goes to active state after relation is removed"""
+def test_remove_one_tester_charm_relation(
+    juju: jubilant.Juju, lightkube_client: lightkube.Client, namespace: str
+):
+    """Remove a few relations with one of the tester charms, and verify the resources from the other tester charm are still there."""
     juju.remove_relation(f"{CHARM_NAME}:secrets", f"{MANIFEST_CHARM_NAME1}:secrets")
     juju.remove_relation(f"{CHARM_NAME}:roles", f"{MANIFEST_CHARM_NAME1}:roles")
     juju.remove_relation(f"{CHARM_NAME}:role-bindings", f"{MANIFEST_CHARM_NAME1}:role-bindings")
@@ -142,9 +159,6 @@ def test_remove_relation(juju: jubilant.Juju):
         lambda status: jubilant.all_active(status) and jubilant.all_agents_idle(status), delay=10
     )
 
-
-@pytest.mark.abort_on_fail
-def test_remove_one_helper_relation(lightkube_client: lightkube.Client, namespace: str):
     time.sleep(
         30
     )  # sync can take up to 10 seconds for reconciliation loop to trigger (+ time to create namespace)
@@ -169,3 +183,37 @@ def test_remove_one_helper_relation(lightkube_client: lightkube.Client, namespac
         with pytest.raises(ApiError) as e_info:
             rolebinding = lightkube_client.get(RoleBinding, name, namespace=namespace)
         assert "not found" in str(e_info)
+
+
+@pytest.mark.abort_on_fail
+def test_upgrade_tester_charm(juju: jubilant.Juju, manifest_tester_charm: Path):
+    """Upgrade manifest-tester charm in-place to the implementation that uses kubernetes_manifest v0.2."""
+    juju.refresh(
+        app=MANIFEST_CHARM_NAME1,
+        path=manifest_tester_charm,
+    )
+
+    # The resource-dispatcher charm will be in error, because it cannot decode secret sent by manifest-tester
+    status = juju.wait(
+        lambda status: jubilant.all_error(status, CHARM_NAME)
+        and jubilant.all_active(status, MANIFEST_CHARM_NAME1)
+        and jubilant.all_agents_idle(status),
+        delay=5,
+    )
+    assert status.apps[CHARM_NAME].units[f"{CHARM_NAME}/0"].workload_status.current == "error"
+
+
+@pytest.mark.abort_on_fail
+def test_upgrade_resource_dispatcher(juju: jubilant.Juju, resource_dispatcher_charm: Path):
+    """Upgrade resource-dispatcher charm in-place to the current implementation (that uses kubernetes_manifest v0.2).
+    This should eventually put the charms to active / idle state at the end.
+    """
+    image_path = METADATA["resources"]["oci-image"]["upstream-source"]
+    resources = {"oci-image": image_path}
+    juju.refresh(app=CHARM_NAME, path=resource_dispatcher_charm, resources=resources)
+
+    # The charm should eventually settle to active idle state
+    status = juju.wait(
+        lambda status: jubilant.all_active(status) and jubilant.all_agents_idle(status), delay=5
+    )
+    assert status.apps[CHARM_NAME].units[f"{CHARM_NAME}/0"].workload_status.current == "active"

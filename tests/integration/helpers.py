@@ -6,13 +6,19 @@ from pathlib import Path
 
 import lightkube
 from charmed_kubeflow_chisme.kubernetes import KubernetesResourceHandler
+from charmed_kubeflow_chisme.testing import CharmSpec
 from lightkube import codecs
 from lightkube.generic_resource import load_in_cluster_generic_resources
 
 logger = logging.getLogger(__name__)
 
-
 RESOURCE_DISPATCHER_CHARM_NAME = "resource-dispatcher"
+METACONTROLLER_OPERATOR = CharmSpec(
+    charm="metacontroller-operator", channel="latest/edge", trust=True
+)
+RESOURCE_DISPATCHER_2_STABLE = CharmSpec(
+    charm="resource-dispatcher", channel="2.0/stable", trust=True
+)
 
 
 def safe_load_file_to_text(filename: str) -> str:

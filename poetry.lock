@@ -2019,25 +2019,24 @@ typing-extensions = ">=4.5.0"
 
 [[package]]
 name = "ops"
-version = "2.23.0"
+version = "3.5.0"
 description = "The Python library behind great charms"
 optional = false
-python-versions = ">=3.8"
+python-versions = ">=3.10"
 groups = ["charm"]
 files = [
-    {file = "ops-2.23.0-py3-none-any.whl", hash = "sha256:7a42840410e8570acc3a4b498973a5bcd3fd0b12dd06837f57b9379b3acdfac3"},
-    {file = "ops-2.23.0.tar.gz", hash = "sha256:3e6c29a8f2119c7b8eaa88c82b5371de236dfcb7a7bf0012a6e2a829f0837fb7"},
+    {file = "ops-3.5.0-py3-none-any.whl", hash = "sha256:07b1d1dbc0f3ca59534d5fe5020a66ee95c528f2430e004922350274509420c6"},
+    {file = "ops-3.5.0.tar.gz", hash = "sha256:e3427889054285bd2711a3a297a77218384eacaf0d1001590ee4437cca115577"},
 ]
 
 [package.dependencies]
-importlib-metadata = "*"
 opentelemetry-api = ">=1.0,<2.0"
 PyYAML = "==6.*"
 websocket-client = "==1.*"
 
 [package.extras]
-testing = ["ops-scenario (==7.23.0)"]
-tracing = ["ops-tracing (==2.23.0)"]
+testing = ["ops-scenario (==8.5.0)"]
+tracing = ["ops-tracing (==3.5.0)"]
 
 [[package]]
 name = "ordered-set"
@@ -3670,4 +3669,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<4.0"
-content-hash = "957d770d73ffc52cc8c509f15c7f3adc0f177ced6ce66465850f7900658b7199"
+content-hash = "7e6a482ccb9ae8df4a6e4482044579dd704ba8186233c63e8051d24cf0df5485"

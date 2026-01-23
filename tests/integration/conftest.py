@@ -56,6 +56,7 @@ def manifest_tester_charm() -> Path:
         name="manifest-tester",
     )
 
+
 @pytest.fixture(scope="module")
 def manifest_tester_no_secret_charm() -> Path:
     """Path to the packed manifest-tester charm with old lib that does not support secrets."""
@@ -63,6 +64,7 @@ def manifest_tester_no_secret_charm() -> Path:
         Path.cwd() / "tests/integration/manifests-tester-no-secret",
         name="manifest-tester-no-secret",
     )
+
 
 @pytest.fixture(scope="module", autouse=True)
 def copy_libraries_into_tester_charm() -> None:

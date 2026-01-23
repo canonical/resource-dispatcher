@@ -6,20 +6,17 @@
 """Mock relation provider charms."""
 
 import glob
-import json
 import logging
 from pathlib import Path
 from typing import List
 
-import yaml
 from charms.resource_dispatcher.v0.kubernetes_manifests import (
     KubernetesManifest,
     KubernetesManifestRequirerWrapper,
-    KubernetesManifestsRequirer,
 )
 from ops import main
 from ops.charm import CharmBase
-from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
+from ops.model import ActiveStatus
 
 logger = logging.getLogger(__name__)
 
@@ -49,39 +46,64 @@ class ManifestsTesterCharm(CharmBase):
         self._manifests_folder = self.model.config["manifests_folder"]
 
         self.framework.observe(self.on.start, self._on_start)
-        self.framework.observe(self.on.config_changed, self._update_service_accounts_relation_data)
-        self.framework.observe(self.on.leader_elected, self._update_service_accounts_relation_data)
+        self.framework.observe(self.on.upgrade_charm, self._update_manifests_in_relation)
+        self.framework.observe(self.on.config_changed, self._update_manifests_in_relation)
+        self.framework.observe(self.on.leader_elected, self._update_manifests_in_relation)
         self.framework.observe(
             self.on[SERVICEACCOUNTS_RELATION_NAME].relation_created,
-            self._update_service_accounts_relation_data,
+            self._update_manifests_in_relation,
         )
-
-        self._poddefaults_manifests_requirer = KubernetesManifestsRequirer(
-            charm=self,
-            relation_name=PODDEFAULTS_RELATION_NAME,
-            manifests_items=self._poddefaults_manifests,
+        self.framework.observe(
+            self.on[SERVICEACCOUNTS_RELATION_NAME].relation_changed,
+            self._update_manifests_in_relation,
         )
-
-        self._secrets_manifests_requirer = KubernetesManifestsRequirer(
-            charm=self,
-            relation_name=SECRETS_RELATION_NAME,
-            manifests_items=self._secrets_manifests,
+        self.framework.observe(
+            self.on[SECRETS_RELATION_NAME].relation_created,
+            self._update_manifests_in_relation,
         )
-
-        self._roles_manifests_requirer = KubernetesManifestsRequirer(
-            charm=self,
-            relation_name=ROLES_RELATION_NAME,
-            manifests_items=self._roles_manifests,
+        self.framework.observe(
+            self.on[SECRETS_RELATION_NAME].relation_changed,
+            self._update_manifests_in_relation,
         )
-
-        self._rolebindings_manifests_requirer = KubernetesManifestsRequirer(
-            charm=self,
-            relation_name=ROLEBINDINGS_RELATION_NAME,
-            manifests_items=self._rolebindings_manifests,
+        self.framework.observe(
+            self.on[PODDEFAULTS_RELATION_NAME].relation_created,
+            self._update_manifests_in_relation,
+        )
+        self.framework.observe(
+            self.on[PODDEFAULTS_RELATION_NAME].relation_changed,
+            self._update_manifests_in_relation,
+        )
+        self.framework.observe(
+            self.on[ROLES_RELATION_NAME].relation_created,
+            self._update_manifests_in_relation,
+        )
+        self.framework.observe(
+            self.on[ROLES_RELATION_NAME].relation_changed,
+            self._update_manifests_in_relation,
+        )
+        self.framework.observe(
+            self.on[ROLEBINDINGS_RELATION_NAME].relation_created,
+            self._update_manifests_in_relation,
+        )
+        self.framework.observe(
+            self.on[ROLEBINDINGS_RELATION_NAME].relation_changed,
+            self._update_manifests_in_relation,
         )
 
         self.service_accounts_requirer_wrapper = KubernetesManifestRequirerWrapper(
             charm=self, relation_name=SERVICEACCOUNTS_RELATION_NAME
+        )
+        self.secrets_requirer_wrapper = KubernetesManifestRequirerWrapper(
+            charm=self, relation_name=SECRETS_RELATION_NAME
+        )
+        self.poddefaults_requirer_wrapper = KubernetesManifestRequirerWrapper(
+            charm=self, relation_name=PODDEFAULTS_RELATION_NAME
+        )
+        self.roles_requirer_wrapper = KubernetesManifestRequirerWrapper(
+            charm=self, relation_name=ROLES_RELATION_NAME
+        )
+        self.rolebindings_requirer_wrapper = KubernetesManifestRequirerWrapper(
+            charm=self, relation_name=ROLEBINDINGS_RELATION_NAME
         )
 
     @property
@@ -108,19 +130,22 @@ class ManifestsTesterCharm(CharmBase):
             manifests.append(KubernetesManifest(file_content))
         return manifests
 
-    def _on_start(self, _):
+    def _on_start(self, event):
         """Set active on start."""
-        self._send_manifest_from_config()
+        self._update_manifests_in_relation(event=event)
         self.model.unit.status = ActiveStatus()
 
-    def _update_service_accounts_relation_data(self, _):
-        self._send_manifest_from_config()
-
-    def _send_manifest_from_config(self):
+    def _update_manifests_in_relation(self, event):
         service_account_name = self.model.config["service_account_name"]
-        config_manifest = SERVICE_ACCOUNT_YAML.format(name=service_account_name)
-        config_manifest_items = [KubernetesManifest(config_manifest)]
-        self.service_accounts_requirer_wrapper.send_data(config_manifest_items)
+        serviceaccount_manifest = [
+            KubernetesManifest(SERVICE_ACCOUNT_YAML.format(name=service_account_name))
+        ]
+
+        self.service_accounts_requirer_wrapper.send_data(serviceaccount_manifest)
+        self.secrets_requirer_wrapper.send_data(self._secrets_manifests)
+        self.poddefaults_requirer_wrapper.send_data(self._poddefaults_manifests)
+        self.roles_requirer_wrapper.send_data(self._roles_manifests)
+        self.rolebindings_requirer_wrapper.send_data(self._rolebindings_manifests)
 
 
 if __name__ == "__main__":  # pragma: nocover

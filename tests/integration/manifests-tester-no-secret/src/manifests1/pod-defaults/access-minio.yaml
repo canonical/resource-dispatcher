@@ -1,7 +1,7 @@
 apiVersion: kubeflow.org/v1alpha1
 kind: PodDefault
 metadata:
- name: access-minio
+ name: access-minio-3
 spec:
  desc: Allow access to Minio
  selector:
@@ -21,4 +21,4 @@ spec:
          key: secretkey
          optional: false
    - name: MINIO_ENDPOINT_URL
-     value: http://minio.kubeflow.svc.cluster.local:9000
+     value: http://minio3.kubeflow.svc.cluster.local:9000

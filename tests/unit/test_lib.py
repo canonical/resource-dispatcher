@@ -12,7 +12,9 @@ from ops.testing import Harness
 
 from lib.charms.harness_extensions.v0.capture_events import capture
 from lib.charms.resource_dispatcher.v0.kubernetes_manifests import (
+    IS_SECRET_FIELD,
     KUBERNETES_MANIFESTS_FIELD,
+    MANIFESTS_SECRET_KEY,
     KubernetesManifest,
     KubernetesManifestRequirerWrapper,
     KubernetesManifestsProvider,
@@ -226,12 +228,12 @@ class TestManifestsProvider:
         other_app = "other"
         harness = Harness(DummyProviderCharm, meta=DUMMY_PROVIDER_METADATA)
         manifest1_content = {
-            "manifests": json.dumps(
+            MANIFESTS_SECRET_KEY: json.dumps(
                 [manifest_item.manifest for manifest_item in RELATION1_MANIFESTS]
             )
         }
         manifest2_content = {
-            "manifests": json.dumps(
+            MANIFESTS_SECRET_KEY: json.dumps(
                 [manifest_item.manifest for manifest_item in RELATION2_MANIFESTS]
             )
         }
@@ -239,8 +241,8 @@ class TestManifestsProvider:
         secret2_id = harness.add_model_secret(other_app, content=manifest2_content)
 
         # Create data
-        databag = {KUBERNETES_MANIFESTS_FIELD: secret1_id, "is-secret": "true"}
-        other_databag = {KUBERNETES_MANIFESTS_FIELD: secret2_id, "is-secret": "true"}
+        databag = {KUBERNETES_MANIFESTS_FIELD: secret1_id, IS_SECRET_FIELD: "true"}
+        other_databag = {KUBERNETES_MANIFESTS_FIELD: secret2_id, IS_SECRET_FIELD: "true"}
 
         # Add data to relation
         harness.add_relation(SERVICE_ACCOUNTS_RELATION, other_app, app_data=databag)
@@ -456,5 +458,5 @@ def get_manifests_from_relation(harness: Harness, relation_id, this_app) -> List
     raw_relation_data = harness.get_relation_data(relation_id=relation_id, app_or_unit=this_app)
     secret_id = raw_relation_data[KUBERNETES_MANIFESTS_FIELD]
     manifest_dump = harness.model.get_secret(id=secret_id).get_content(refresh=True)
-    actual_manifests = json.loads(manifest_dump["manifests"])
+    actual_manifests = json.loads(manifest_dump[MANIFESTS_SECRET_KEY])
     return actual_manifests

@@ -16,3 +16,4 @@ new_config
 .mypy_cache
 
 namespace-example.yaml
+coverage.xml

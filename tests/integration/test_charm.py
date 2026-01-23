@@ -135,7 +135,7 @@ def test_remove_relation(juju: jubilant.Juju):
     juju.remove_relation(f"{CHARM_NAME}:roles", f"{MANIFEST_CHARM_NAME1}:roles")
     juju.remove_relation(f"{CHARM_NAME}:role-bindings", f"{MANIFEST_CHARM_NAME1}:role-bindings")
     juju.wait(
-        lambda status: jubilant.all_active(status) and jubilant.all_agents_idle(status), delay=10
+        lambda status: jubilant.all_active(status) and jubilant.all_agents_idle(status), delay=5
     )
 
 

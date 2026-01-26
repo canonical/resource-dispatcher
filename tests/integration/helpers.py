@@ -18,7 +18,7 @@ METACONTROLLER_OPERATOR = CharmSpec(
     charm="metacontroller-operator", channel="latest/edge", trust=True
 )
 RESOURCE_DISPATCHER_NO_SECRET = CharmSpec(
-    charm="resource-dispatcher", channel="2.0/stable", revision=402, trust=True
+    charm="resource-dispatcher", channel="2.0/stable", trust=True
 )
 RESOURCE_DISPATCHER_NO_SECRET_REVISION = (
     402  # Revision that still uses kubernetes_manifests lib 0.1

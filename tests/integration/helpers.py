@@ -20,6 +20,9 @@ METACONTROLLER_OPERATOR = CharmSpec(
 RESOURCE_DISPATCHER_NO_SECRET = CharmSpec(
     charm="resource-dispatcher", channel="2.0/stable", revision=402, trust=True
 )
+RESOURCE_DISPATCHER_NO_SECRET_REVISION = (
+    402  # Revision that still uses kubernetes_manifests lib 0.1
+)
 
 
 def safe_load_file_to_text(filename: str) -> str:

@@ -29,6 +29,7 @@ from .helpers import (
     METACONTROLLER_OPERATOR,
     RESOURCE_DISPATCHER_CHARM_NAME,
     RESOURCE_DISPATCHER_NO_SECRET,
+    RESOURCE_DISPATCHER_NO_SECRET_REVISION,
     deploy_k8s_resources,
 )
 
@@ -84,7 +85,7 @@ def test_deploy_resource_dispatcher_charm(juju: jubilant.Juju):
         charm=RESOURCE_DISPATCHER_NO_SECRET.charm,
         app=RESOURCE_DISPATCHER_CHARM_NAME,
         channel=RESOURCE_DISPATCHER_NO_SECRET.channel,
-        revision=RESOURCE_DISPATCHER_NO_SECRET.revision,
+        revision=RESOURCE_DISPATCHER_NO_SECRET_REVISION,
         trust=True,
     )
     status = juju.wait(

@@ -25,11 +25,15 @@ from lightkube.generic_resource import create_namespaced_resource
 from lightkube.resources.core_v1 import Secret, ServiceAccount
 from lightkube.resources.rbac_authorization_v1 import Role, RoleBinding
 
-from .helpers import METACONTROLLER_OPERATOR, deploy_k8s_resources
+from .helpers import (
+    METACONTROLLER_OPERATOR,
+    RESOURCE_DISPATCHER_CHARM_NAME,
+    RESOURCE_DISPATCHER_NO_SECRET,
+    deploy_k8s_resources,
+)
 
 logger = logging.getLogger(__name__)
 
-CHARM_NAME = "resource-dispatcher"
 MANIFESTS_TESTER_CONFIG = yaml.safe_load(
     Path("./tests/integration/manifests-tester/config.yaml").read_text()
 )
@@ -77,15 +81,21 @@ def test_deploy_metacontroller_setup(juju: jubilant.Juju):
 def test_deploy_resource_dispatcher_charm(juju: jubilant.Juju):
     """Deploy resource-dispatcher charm from 2.0/stable channel, which uses kubernetes_manifest lib 0.1."""
     juju.deploy(
-        charm=CHARM_NAME,
-        app=CHARM_NAME,
-        channel="2.0/stable",
+        charm=RESOURCE_DISPATCHER_NO_SECRET.charm,
+        app=RESOURCE_DISPATCHER_CHARM_NAME,
+        channel=RESOURCE_DISPATCHER_NO_SECRET.channel,
+        revision=RESOURCE_DISPATCHER_NO_SECRET.revision,
         trust=True,
     )
     status = juju.wait(
         lambda status: jubilant.all_active(status) and jubilant.all_agents_idle(status), delay=5
     )
-    assert status.apps[CHARM_NAME].units[f"{CHARM_NAME}/0"].workload_status.current == "active"
+    assert (
+        status.apps[RESOURCE_DISPATCHER_CHARM_NAME]
+        .units[f"{RESOURCE_DISPATCHER_CHARM_NAME}/0"]
+        .workload_status.current
+        == "active"
+    )
 
 
 def test_build_and_deploy_tester_charm(juju: jubilant.Juju, manifest_tester_no_secret_charm: Path):
@@ -98,18 +108,33 @@ def test_build_and_deploy_tester_charm(juju: jubilant.Juju, manifest_tester_no_s
     status = juju.wait(
         lambda status: jubilant.all_active(status) and jubilant.all_agents_idle(status), delay=5
     )
-    assert status.apps[CHARM_NAME].units[f"{CHARM_NAME}/0"].workload_status.current == "active"
+    assert (
+        status.apps[RESOURCE_DISPATCHER_CHARM_NAME]
+        .units[f"{RESOURCE_DISPATCHER_CHARM_NAME}/0"]
+        .workload_status.current
+        == "active"
+    )
 
 
 def test_integrate_tester_with_resource_dispatcher(juju: jubilant.Juju):
     """Integrate manifest-tester charm with resource-dispatcher."""
-    juju.integrate(f"{CHARM_NAME}:secrets", f"{MANIFEST_TESTER_CHARM}:secrets")
-    juju.integrate(f"{CHARM_NAME}:service-accounts", f"{MANIFEST_TESTER_CHARM}:service-accounts")
-    juju.integrate(f"{CHARM_NAME}:pod-defaults", f"{MANIFEST_TESTER_CHARM}:pod-defaults")
+    juju.integrate(f"{RESOURCE_DISPATCHER_CHARM_NAME}:secrets", f"{MANIFEST_TESTER_CHARM}:secrets")
+    juju.integrate(
+        f"{RESOURCE_DISPATCHER_CHARM_NAME}:service-accounts",
+        f"{MANIFEST_TESTER_CHARM}:service-accounts",
+    )
+    juju.integrate(
+        f"{RESOURCE_DISPATCHER_CHARM_NAME}:pod-defaults", f"{MANIFEST_TESTER_CHARM}:pod-defaults"
+    )
     status = juju.wait(
         lambda status: jubilant.all_active(status) and jubilant.all_agents_idle(status), delay=5
     )
-    assert status.apps[CHARM_NAME].units[f"{CHARM_NAME}/0"].workload_status.current == "active"
+    assert (
+        status.apps[RESOURCE_DISPATCHER_CHARM_NAME]
+        .units[f"{RESOURCE_DISPATCHER_CHARM_NAME}/0"]
+        .workload_status.current
+        == "active"
+    )
 
 
 def test_manifests_created_from_tester_charm_old(
@@ -148,37 +173,56 @@ def test_upgrade_tester_charm(juju: jubilant.Juju, manifest_tester_charm: Path):
 
     # The resource-dispatcher charm will be in error, because it cannot decode secret sent by manifest-tester
     status = juju.wait(
-        lambda status: jubilant.all_error(status, CHARM_NAME)
+        lambda status: jubilant.all_error(status, RESOURCE_DISPATCHER_CHARM_NAME)
         and jubilant.all_active(status, MANIFEST_TESTER_CHARM)
         and jubilant.all_agents_idle(status),
         delay=5,
     )
-    assert status.apps[CHARM_NAME].units[f"{CHARM_NAME}/0"].workload_status.current == "error"
+    assert (
+        status.apps[RESOURCE_DISPATCHER_CHARM_NAME]
+        .units[f"{RESOURCE_DISPATCHER_CHARM_NAME}/0"]
+        .workload_status.current
+        == "error"
+    )
 
 
 def test_upgrade_resource_dispatcher(juju: jubilant.Juju, resource_dispatcher_charm: Path):
     """Upgrade resource-dispatcher charm in-place to the current implementation (that uses kubernetes_manifest v0.2)"""
     image_path = METADATA["resources"]["oci-image"]["upstream-source"]
     resources = {"oci-image": image_path}
-    juju.refresh(app=CHARM_NAME, path=resource_dispatcher_charm, resources=resources)
+    juju.refresh(
+        app=RESOURCE_DISPATCHER_CHARM_NAME, path=resource_dispatcher_charm, resources=resources
+    )
 
     # The charm should eventually settle to active idle state
     status = juju.wait(
         lambda status: jubilant.all_active(status) and jubilant.all_agents_idle(status), delay=5
     )
-    assert status.apps[CHARM_NAME].units[f"{CHARM_NAME}/0"].workload_status.current == "active"
+    assert (
+        status.apps[RESOURCE_DISPATCHER_CHARM_NAME]
+        .units[f"{RESOURCE_DISPATCHER_CHARM_NAME}/0"]
+        .workload_status.current
+        == "active"
+    )
 
 
 def test_integrate_new_relations_with_resource_dispatcher(
     juju: jubilant.Juju, lightkube_client: lightkube.Client, namespace: str
 ):
     """Integrate manifest-tester charm with resource-dispatcher over newly added roles and role-bindings relation."""
-    juju.integrate(f"{CHARM_NAME}:roles", f"{MANIFEST_TESTER_CHARM}:roles")
-    juju.integrate(f"{CHARM_NAME}:role-bindings", f"{MANIFEST_TESTER_CHARM}:role-bindings")
+    juju.integrate(f"{RESOURCE_DISPATCHER_CHARM_NAME}:roles", f"{MANIFEST_TESTER_CHARM}:roles")
+    juju.integrate(
+        f"{RESOURCE_DISPATCHER_CHARM_NAME}:role-bindings", f"{MANIFEST_TESTER_CHARM}:role-bindings"
+    )
     status = juju.wait(
         lambda status: jubilant.all_active(status) and jubilant.all_agents_idle(status), delay=5
     )
-    assert status.apps[CHARM_NAME].units[f"{CHARM_NAME}/0"].workload_status.current == "active"
+    assert (
+        status.apps[RESOURCE_DISPATCHER_CHARM_NAME]
+        .units[f"{RESOURCE_DISPATCHER_CHARM_NAME}/0"]
+        .workload_status.current
+        == "active"
+    )
     time.sleep(
         30
     )  # sync can take up to 10 seconds for reconciliation loop to trigger (+ time to create namespace)

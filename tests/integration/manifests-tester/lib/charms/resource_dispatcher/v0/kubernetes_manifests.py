@@ -99,8 +99,8 @@ class SomeCharm(CharmBase):
 import json
 import logging
 import os
-from dataclasses import dataclass, field
 import re
+from dataclasses import dataclass, field
 from typing import List, Optional, Union
 
 import yaml
@@ -125,6 +125,7 @@ KUBERNETES_MANIFESTS_FIELD = "kubernetes_manifests"
 IS_SECRET_FIELD = "is_secret"
 MANIFESTS_SECRET_KEY = "manifests"
 
+
 def generate_secret_label(relation: Relation) -> str:
     """Generate a unique secret label based on the relation name and ID."""
     return f"manifest.{relation.name}.{relation.id}"
@@ -140,6 +141,7 @@ def parse_relation_id_from_secret_label(secret_label: str) -> Optional[int]:
         return int(match.group("relation_id"))
     except ValueError:
         return None
+
 
 @dataclass
 class KubernetesManifest:
@@ -199,9 +201,7 @@ class KubernetesManifestsProvider(Object):
         self._charm = charm
         self._relation_name = relation_name
 
-        self.framework.observe(
-            self._charm.on.secret_changed, self._on_secret_changed_event
-        )
+        self.framework.observe(self._charm.on.secret_changed, self._on_secret_changed_event)
         self.framework.observe(
             self._charm.on[self._relation_name].relation_changed, self._on_relation_changed
         )
@@ -269,7 +269,9 @@ class KubernetesManifestsProvider(Object):
 
     def register_secrets_to_relation(self, relation: Relation):
         if not self.is_secret_enabled(relation=relation):
-            logger.info("Detected the other side is not sending secret, skipping secret registration.")
+            logger.info(
+                "Detected the other side is not sending secret, skipping secret registration."
+            )
             return
 
         secret_uri = relation.data[relation.app].get(KUBERNETES_MANIFESTS_FIELD)
@@ -390,7 +392,7 @@ class KubernetesManifestsRequirer(Object):
         if relation.name != self._relation_name:
             logging.info("Event triggered for some other relation.")
             return
-        
+
         # Ignore the event raised for secret that no longer exists
         # https://github.com/juju/juju/issues/20794
         try:
@@ -400,7 +402,6 @@ class KubernetesManifestsRequirer(Object):
             return
 
         event.remove_revision()
-
 
 
 class KubernetesManifestRequirerWrapper(Object):

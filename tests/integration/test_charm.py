@@ -15,11 +15,10 @@ from lightkube.generic_resource import create_namespaced_resource
 from lightkube.resources.core_v1 import Secret, ServiceAccount
 from lightkube.resources.rbac_authorization_v1 import Role, RoleBinding
 
-from .helpers import METACONTROLLER_OPERATOR, deploy_k8s_resources
+from .helpers import METACONTROLLER_OPERATOR, RESOURCE_DISPATCHER_CHARM_NAME, deploy_k8s_resources
 
 logger = logging.getLogger(__name__)
 
-CHARM_NAME = "resource-dispatcher"
 MANIFEST_CHARM_NAME1 = "manifests-tester1"
 MANIFEST_CHARM_NAME2 = "manifests-tester2"
 MANIFEST_CHARM_NO_SECRET_NAME1 = "manifests-tester-no-secret1"
@@ -80,14 +79,19 @@ def test_deploy_resource_dispatcher_charm(juju: jubilant.Juju, resource_dispatch
     resources = {"oci-image": image_path}
     juju.deploy(
         charm=resource_dispatcher_charm,
-        app=CHARM_NAME,
+        app=RESOURCE_DISPATCHER_CHARM_NAME,
         resources=resources,
         trust=True,
     )
     status = juju.wait(
         lambda status: jubilant.all_active(status) and jubilant.all_agents_idle(status), delay=5
     )
-    assert status.apps[CHARM_NAME].units[f"{CHARM_NAME}/0"].workload_status.current == "active"
+    assert (
+        status.apps[RESOURCE_DISPATCHER_CHARM_NAME]
+        .units[f"{RESOURCE_DISPATCHER_CHARM_NAME}/0"]
+        .workload_status.current
+        == "active"
+    )
 
 
 @pytest.mark.parametrize(
@@ -141,7 +145,12 @@ def test_build_and_deploy_tester_charms(
     status = juju.wait(
         lambda status: jubilant.all_active(status) and jubilant.all_agents_idle(status), delay=5
     )
-    assert status.apps[CHARM_NAME].units[f"{CHARM_NAME}/0"].workload_status.current == "active"
+    assert (
+        status.apps[RESOURCE_DISPATCHER_CHARM_NAME]
+        .units[f"{RESOURCE_DISPATCHER_CHARM_NAME}/0"]
+        .workload_status.current
+        == "active"
+    )
 
 
 @pytest.mark.parametrize(
@@ -155,25 +164,41 @@ def test_integrate_tester_with_resource_dispatcher(
     juju: jubilant.Juju, tester1_charm_name: str, tester2_charm_name: str
 ):
     """Integrate manifest-tester charm with resource-dispatcher."""
-    juju.integrate(f"{CHARM_NAME}:secrets", f"{tester1_charm_name}:secrets")
-    juju.integrate(f"{CHARM_NAME}:service-accounts", f"{tester1_charm_name}:service-accounts")
-    juju.integrate(f"{CHARM_NAME}:secrets", f"{tester2_charm_name}:secrets")
-    juju.integrate(f"{CHARM_NAME}:pod-defaults", f"{tester1_charm_name}:pod-defaults")
+    juju.integrate(f"{RESOURCE_DISPATCHER_CHARM_NAME}:secrets", f"{tester1_charm_name}:secrets")
+    juju.integrate(
+        f"{RESOURCE_DISPATCHER_CHARM_NAME}:service-accounts",
+        f"{tester1_charm_name}:service-accounts",
+    )
+    juju.integrate(f"{RESOURCE_DISPATCHER_CHARM_NAME}:secrets", f"{tester2_charm_name}:secrets")
+    juju.integrate(
+        f"{RESOURCE_DISPATCHER_CHARM_NAME}:pod-defaults", f"{tester1_charm_name}:pod-defaults"
+    )
 
     # roles relation support is only added recently -- they don't exist on old charms
     if tester1_charm_name != MANIFEST_CHARM_NO_SECRET_NAME1:
-        juju.integrate(f"{CHARM_NAME}:roles", f"{tester1_charm_name}:roles")
-        juju.integrate(f"{CHARM_NAME}:role-bindings", f"{tester1_charm_name}:role-bindings")
+        juju.integrate(f"{RESOURCE_DISPATCHER_CHARM_NAME}:roles", f"{tester1_charm_name}:roles")
+        juju.integrate(
+            f"{RESOURCE_DISPATCHER_CHARM_NAME}:role-bindings",
+            f"{tester1_charm_name}:role-bindings",
+        )
 
     # role-bindings relation support is only added recently -- they don't exist on old charms
     if tester2_charm_name != MANIFEST_CHARM_NO_SECRET_NAME2:
-        juju.integrate(f"{CHARM_NAME}:roles", f"{tester2_charm_name}:roles")
-        juju.integrate(f"{CHARM_NAME}:role-bindings", f"{tester2_charm_name}:role-bindings")
+        juju.integrate(f"{RESOURCE_DISPATCHER_CHARM_NAME}:roles", f"{tester2_charm_name}:roles")
+        juju.integrate(
+            f"{RESOURCE_DISPATCHER_CHARM_NAME}:role-bindings",
+            f"{tester2_charm_name}:role-bindings",
+        )
 
     status = juju.wait(
         lambda status: jubilant.all_active(status) and jubilant.all_agents_idle(status), delay=5
     )
-    assert status.apps[CHARM_NAME].units[f"{CHARM_NAME}/0"].workload_status.current == "active"
+    assert (
+        status.apps[RESOURCE_DISPATCHER_CHARM_NAME]
+        .units[f"{RESOURCE_DISPATCHER_CHARM_NAME}/0"]
+        .workload_status.current
+        == "active"
+    )
 
 
 @pytest.mark.parametrize(
@@ -299,10 +324,16 @@ def test_remove_one_tester_relation(
     expected_existing_rolebindings,
 ):
     """Make sure that charm goes to active state after relation is removed"""
-    juju.remove_relation(f"{CHARM_NAME}:secrets", f"{tester_charm_name}:secrets")
+    juju.remove_relation(
+        f"{RESOURCE_DISPATCHER_CHARM_NAME}:secrets", f"{tester_charm_name}:secrets"
+    )
     if tester_charm_name != MANIFEST_CHARM_NO_SECRET_NAME2:
-        juju.remove_relation(f"{CHARM_NAME}:roles", f"{tester_charm_name}:roles")
-        juju.remove_relation(f"{CHARM_NAME}:role-bindings", f"{tester_charm_name}:role-bindings")
+        juju.remove_relation(
+            f"{RESOURCE_DISPATCHER_CHARM_NAME}:roles", f"{tester_charm_name}:roles"
+        )
+        juju.remove_relation(
+            f"{RESOURCE_DISPATCHER_CHARM_NAME}:role-bindings", f"{tester_charm_name}:role-bindings"
+        )
 
     juju.wait(
         lambda status: jubilant.all_active(status) and jubilant.all_agents_idle(status), delay=10

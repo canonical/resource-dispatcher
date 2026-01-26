@@ -17,8 +17,8 @@ RESOURCE_DISPATCHER_CHARM_NAME = "resource-dispatcher"
 METACONTROLLER_OPERATOR = CharmSpec(
     charm="metacontroller-operator", channel="latest/edge", trust=True
 )
-RESOURCE_DISPATCHER_2_STABLE = CharmSpec(
-    charm="resource-dispatcher", channel="2.0/stable", trust=True
+RESOURCE_DISPATCHER_NO_SECRET = CharmSpec(
+    charm="resource-dispatcher", channel="2.0/stable", revision=402, trust=True
 )
 
 

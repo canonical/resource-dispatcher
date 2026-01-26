@@ -217,6 +217,10 @@ class KubernetesManifestsProvider(Object):
             for evt in refresh_event:
                 self.framework.observe(evt, self._on_relation_changed)
 
+    def is_secret_enabled(self, relation: Relation) -> bool:
+        """Return whether secret support is enabled for this relation."""
+        return relation.data[relation.app].get(IS_SECRET_FIELD, "false") == "true"
+
     def get_manifests(self) -> List[dict]:
         """
         Returns a list of dictionaries sent in the data of relation relation_name.
@@ -239,8 +243,8 @@ class KubernetesManifestsProvider(Object):
             if other_app.name == other_app_to_skip:
                 # Skip this app because it is leaving a broken relation
                 continue
-            is_secret = relation.data[other_app].get(IS_SECRET_FIELD, "false") == "true"
-            if is_secret:
+
+            if self.is_secret_enabled(relation=relation):
                 secret_id = relation.data[other_app].get(KUBERNETES_MANIFESTS_FIELD, None)
                 if not secret_id:
                     logger.error(
@@ -264,7 +268,7 @@ class KubernetesManifestsProvider(Object):
         return manifests
 
     def register_secrets_to_relation(self, relation: Relation):
-        if relation.data[relation.app].get(IS_SECRET_FIELD) != "true":
+        if not self.is_secret_enabled(relation=relation):
             logger.info("Detected the other side is not sending secret, skipping secret registration.")
             return
 

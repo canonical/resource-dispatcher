@@ -303,3 +303,15 @@ class TestCharm:
             harness.charm._update_manifests(secrets_manifests_provider, "")
         assert "Failed to process invalid manifest. See debug logs" in str(e_info)
         assert e_info.value.status_type(BlockedStatus)
+
+    @patch(
+        "charm.KubernetesServicePatch",
+        lambda x, y, service_name, service_type, refresh_event: None,
+    )
+    @patch("charm.ResourceDispatcherOperator._deploy_k8s_resources")
+    def test_charm_upgrade_calls_deploy_k8s_resources(
+        self, deploy_k8s_resources: MagicMock, harness: Harness
+    ):
+        harness.begin()
+        harness.charm.on.upgrade_charm.emit()
+        deploy_k8s_resources.assert_called_once()

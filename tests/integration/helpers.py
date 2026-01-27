@@ -7,13 +7,16 @@ from pathlib import Path
 
 import lightkube
 from charmed_kubeflow_chisme.kubernetes import KubernetesResourceHandler
+from charmed_kubeflow_chisme.testing import CharmSpec
 from lightkube import codecs
 from lightkube.generic_resource import load_in_cluster_generic_resources
 
 logger = logging.getLogger(__name__)
 
-
 RESOURCE_DISPATCHER_CHARM_NAME = "resource-dispatcher"
+RESOURCE_DISPATCHER_NO_SECRET_REVISION = (
+    402  # Revision that still uses kubernetes_manifests lib 0.1
+)
 
 
 def safe_load_file_to_text(filename: str) -> str:

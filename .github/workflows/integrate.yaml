@@ -60,10 +60,36 @@ jobs:
       # See: https://github.com/canonical/resource-dispatcher/issues/66
       apply: false
 
-  integration:
-    name: Integration Test (build and deploy)
-    runs-on: ubuntu-24.04
+  build:
+    needs:
+      - lib-check
+      - lint
+      - unit
+      - terraform-checks
+    strategy:
+      matrix:
+        path:
+          - .
+          - tests/integration/manifests-tester
+          - tests/integration/manifests-tester-no-secret
+    name: Build charm | ${{ matrix.path }}
+    uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@v41.1.0
+    with:
+      path-to-charm-directory: ${{ matrix.path }}
+      cache: false
 
+  integration:
+    strategy:
+      fail-fast: false
+      matrix:
+        tox-env:
+          - integration-charm
+          - integration-upgrade-happy-path
+          - integration-upgrade-erronous-path
+    name: Integration Test (${{ matrix.tox-env }})
+    runs-on: ubuntu-24.04
+    needs:
+      - build
     steps:
     - name: Check out repo
       uses: actions/checkout@v4
@@ -77,8 +103,14 @@ jobs:
         sudo snap install concierge --classic
         sudo concierge prepare --trace
 
+    - name: Download packed charm(s)
+      uses: actions/download-artifact@v7
+      with:
+        pattern: ${{ needs.build.outputs.artifact-prefix }}-*
+        merge-multiple: true
+        
     - name: Run integration tests
-      run: tox -vve integration
+      run: tox -vve ${{ matrix.tox-env }}
 
     # On failure, capture debugging resources
     - name: Get all

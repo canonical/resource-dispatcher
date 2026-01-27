@@ -26,7 +26,7 @@ MANIFESTS_TESTER_NO_SECRET_CHARM_PATH = Path(
     "tests/integration/manifests-tester-no-secret"
 ).absolute()
 
-NAMESPACE_MANIFEST_FILE = "./tests/integration/namespace.yaml"
+NAMESPACE_MANIFEST_FILE = "./tests/integration/resources/namespace.yaml"
 TESTING_LABELS = ["user.kubeflow.org/enabled"]  # Might be more than one in the future
 
 
@@ -57,6 +57,15 @@ def manifest_tester_charm() -> Path:
     )
 
 
+@pytest.fixture(scope="module")
+def manifest_tester_no_secret_charm() -> Path:
+    """Path to the packed manifest-tester charm with old lib that does not support secrets."""
+    return get_or_build_charm(
+        Path.cwd() / "tests/integration/manifests-tester-no-secret",
+        name="manifest-tester-no-secret",
+    )
+
+
 @pytest.fixture(scope="module", autouse=True)
 def copy_libraries_into_tester_charm() -> None:
     """Ensure that the tester charms use the current libraries."""
@@ -71,7 +80,7 @@ def lightkube_client() -> lightkube.Client:
     return client
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="module")
 def namespace(lightkube_client: lightkube.Client):
     yaml_text = safe_load_file_to_text(NAMESPACE_MANIFEST_FILE)
     yaml_rendered = yaml.safe_load(yaml_text)

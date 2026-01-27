@@ -14,7 +14,7 @@ from charms.resource_dispatcher.v0.kubernetes_manifests import KubernetesManifes
 from lightkube import ApiError
 from lightkube.generic_resource import load_in_cluster_generic_resources
 from lightkube.models.core_v1 import ServicePort
-from ops import main
+from ops import UpgradeCharmEvent, main
 from ops.charm import CharmBase
 from ops.framework import EventBase
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus
@@ -54,7 +54,7 @@ class ResourceDispatcherOperator(CharmBase):
         self._k8s_resource_handler = None
 
         self.framework.observe(self.on.install, self._on_install)
-        self.framework.observe(self.on.upgrade_charm, self._on_event)
+        self.framework.observe(self.on.upgrade_charm, self._on_upgrade_charm)
         self.framework.observe(self.on.config_changed, self._on_event)
         self.framework.observe(self.on.remove, self._on_remove)
 
@@ -179,6 +179,12 @@ class ResourceDispatcherOperator(CharmBase):
         """Installation only tasks."""
         # deploy K8S resources to speed up deployment
         self._deploy_k8s_resources()
+
+    def _on_upgrade_charm(self, event: UpgradeCharmEvent):
+        """Handle event when charm is upgraded"""
+        # deploy K8S resources to speed up deployment
+        self._deploy_k8s_resources()
+        self._on_event(event=event)
 
     def _update_layer(self) -> None:
         """Update the Pebble configuration layer (if changed)."""

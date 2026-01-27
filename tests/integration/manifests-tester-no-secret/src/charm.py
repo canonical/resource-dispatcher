@@ -23,6 +23,8 @@ logger = logging.getLogger(__name__)
 PODDEFAULTS_RELATION_NAME = "pod-defaults"
 SECRETS_RELATION_NAME = "secrets"
 SERVICEACCOUNTS_RELATION_NAME = "service-accounts"
+ROLES_RELATION_NAME = "roles"
+ROLEBINDINGS_RELATION_NAME = "role-bindings"
 
 SERVICE_ACCOUNT_YAML = """
 apiVersion: v1
@@ -31,7 +33,6 @@ metadata:
   name: {name}
 secrets:
 - name: s3creds
-
 """
 
 
@@ -71,22 +72,6 @@ class ManifestsTesterCharm(CharmBase):
             self.on[PODDEFAULTS_RELATION_NAME].relation_changed,
             self._update_manifests_in_relation,
         )
-        self.framework.observe(
-            self.on[ROLES_RELATION_NAME].relation_created,
-            self._update_manifests_in_relation,
-        )
-        self.framework.observe(
-            self.on[ROLES_RELATION_NAME].relation_changed,
-            self._update_manifests_in_relation,
-        )
-        self.framework.observe(
-            self.on[ROLEBINDINGS_RELATION_NAME].relation_created,
-            self._update_manifests_in_relation,
-        )
-        self.framework.observe(
-            self.on[ROLEBINDINGS_RELATION_NAME].relation_changed,
-            self._update_manifests_in_relation,
-        )
 
         self.service_accounts_requirer_wrapper = KubernetesManifestRequirerWrapper(
             charm=self, relation_name=SERVICEACCOUNTS_RELATION_NAME
@@ -96,12 +81,6 @@ class ManifestsTesterCharm(CharmBase):
         )
         self.poddefaults_requirer_wrapper = KubernetesManifestRequirerWrapper(
             charm=self, relation_name=PODDEFAULTS_RELATION_NAME
-        )
-        self.roles_requirer_wrapper = KubernetesManifestRequirerWrapper(
-            charm=self, relation_name=ROLES_RELATION_NAME
-        )
-        self.rolebindings_requirer_wrapper = KubernetesManifestRequirerWrapper(
-            charm=self, relation_name=ROLEBINDINGS_RELATION_NAME
         )
 
     @property
@@ -134,8 +113,6 @@ class ManifestsTesterCharm(CharmBase):
         self.service_accounts_requirer_wrapper.send_data(serviceaccount_manifest)
         self.secrets_requirer_wrapper.send_data(self._secrets_manifests)
         self.poddefaults_requirer_wrapper.send_data(self._poddefaults_manifests)
-        self.roles_requirer_wrapper.send_data(self._roles_manifests)
-        self.rolebindings_requirer_wrapper.send_data(self._rolebindings_manifests)
 
 
 if __name__ == "__main__":  # pragma: nocover

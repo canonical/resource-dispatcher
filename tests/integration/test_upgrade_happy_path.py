@@ -21,10 +21,9 @@ from lightkube.generic_resource import create_namespaced_resource
 from lightkube.resources.core_v1 import Secret, ServiceAccount
 from lightkube.resources.rbac_authorization_v1 import Role, RoleBinding
 
+from .charms_dependencies import METACONTROLLER_OPERATOR, RESOURCE_DISPATCHER_NO_SECRET
 from .helpers import (
-    METACONTROLLER_OPERATOR,
     RESOURCE_DISPATCHER_CHARM_NAME,
-    RESOURCE_DISPATCHER_NO_SECRET,
     RESOURCE_DISPATCHER_NO_SECRET_REVISION,
     deploy_k8s_resources,
 )

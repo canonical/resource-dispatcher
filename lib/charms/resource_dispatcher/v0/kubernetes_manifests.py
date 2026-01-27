@@ -284,14 +284,19 @@ class KubernetesManifestsProvider(Object):
 
         secret_uri = relation.data[relation.app].get(KUBERNETES_MANIFESTS_FIELD)
         if not secret_uri:
+            logger.error(
+                f"Could not find the secret URI in field {KUBERNETES_MANIFESTS_FIELD} in the relation data "
+                f"of the relation {relation.name} and ID {relation.id}."
+            )
             return
         secret_label = generate_secret_label(relation=relation)
         try:
-            # See if the secret has been correctly labelled already
-            self.model.get_secret(label=secret_label)
-        except SecretNotFoundError:
             # Attach appropriate label to the secret
             self.model.get_secret(id=secret_uri, label=secret_label)
+        except SecretNotFoundError:
+            logger.error(
+                f"The secret with URI {secret_uri} received in {relation.name} ID {relation.id} does not exist in the model."
+            )
 
     def _on_relation_changed(self, event: RelationChangedEvent):
         """Handler for relation-changed event for this relation."""
@@ -318,7 +323,7 @@ class KubernetesManifestsProvider(Object):
         relation = self.model.get_relation(self._relation_name, relation_id)
         if not relation:
             logger.info(
-                f"Received secret {event.secret.label} but couldn't parse, seems irrelevant."
+                f"Received secret {event.secret.label} but couldn't fetch the relation, seems irrelevant."
             )
             return
 

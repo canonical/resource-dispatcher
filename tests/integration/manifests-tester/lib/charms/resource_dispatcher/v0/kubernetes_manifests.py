@@ -100,12 +100,12 @@ class SomeCharm(CharmBase):
 import json
 import logging
 import os
-from dataclasses import dataclass, field
 import re
+from dataclasses import dataclass, field
 from typing import List, Optional, Union
 
 import yaml
-from ops import Relation, RelationChangedEvent, SecretRemoveEvent
+from ops import ModelError, Relation, RelationChangedEvent, SecretRemoveEvent
 from ops.charm import CharmBase, RelationEvent, SecretChangedEvent
 from ops.framework import BoundEvent, EventBase, EventSource, Object, ObjectEvents
 from ops.model import SecretNotFoundError
@@ -126,6 +126,7 @@ KUBERNETES_MANIFESTS_FIELD = "kubernetes_manifests"
 IS_SECRET_FIELD = "is_secret"
 MANIFESTS_SECRET_KEY = "manifests"
 
+
 def generate_secret_label(relation: Relation) -> str:
     """Generate a unique secret label based on the relation name and ID."""
     return f"manifest.{relation.name}.{relation.id}"
@@ -141,6 +142,7 @@ def parse_relation_id_from_secret_label(secret_label: str) -> Optional[int]:
         return int(match.group("relation_id"))
     except ValueError:
         return None
+
 
 @dataclass
 class KubernetesManifest:
@@ -201,9 +203,7 @@ class KubernetesManifestsProvider(Object):
         self._charm = charm
         self._relation_name = relation_name
 
-        self.framework.observe(
-            self._charm.on.secret_changed, self._on_secret_changed_event
-        )
+        self.framework.observe(self._charm.on.secret_changed, self._on_secret_changed_event)
         self.framework.observe(
             self._charm.on[self._relation_name].relation_changed, self._on_relation_changed
         )
@@ -256,13 +256,20 @@ class KubernetesManifestsProvider(Object):
                         f"manifests are in a secret, but no secret id was provided."
                     )
                     continue
-                secret = self._charm.model.get_secret(id=secret_id)
-                if not secret:
+                try:
+                    secret = self._charm.model.get_secret(id=secret_id)
+                except SecretNotFoundError:
                     logger.error(
                         f"Relation {relation.name} ID {relation.id} from app {other_app.name} provided "
                         f"secret id '{secret_id}' but no such secret exists."
                     )
-                    continue
+                    raise
+                except ModelError:
+                    logger.error(
+                        f"Relation {relation.name} ID {relation.id} from app {other_app.name} provided "
+                        f"secret id '{secret_id}' but the secret cannot be read / decoded."
+                    )
+                    raise
                 secret_content = secret.get_content(refresh=True)
                 json_data = secret_content.get(MANIFESTS_SECRET_KEY, "[]")
             else:
@@ -273,7 +280,7 @@ class KubernetesManifestsProvider(Object):
 
     def register_secrets_to_relation(self, relation: Relation):
         """Register the secret received in the relation with a label (local to this application).
-        This is necessary because afterwards, we will always reference this secret with its local label.
+        This is necessary because afterwards in secret-changed, we reference this secret with its local label.
         """
         if not self.is_secret_enabled(relation=relation):
             logger.info(
@@ -296,6 +303,10 @@ class KubernetesManifestsProvider(Object):
         except SecretNotFoundError:
             logger.error(
                 f"The secret with URI {secret_uri} received in {relation.name} ID {relation.id} does not exist in the model."
+            )
+        except ModelError:
+            logger.error(
+                f"The secret with URI {secret_uri} received in {relation.name} ID {relation.id} could not be read / decoded."
             )
 
     def _on_relation_changed(self, event: RelationChangedEvent):
@@ -407,7 +418,7 @@ class KubernetesManifestsRequirer(Object):
         if relation.name != self._relation_name:
             logging.info("Event triggered for some other relation.")
             return
-        
+
         # Ignore the event raised for secret that no longer exists
         # https://github.com/juju/juju/issues/20794
         try:
@@ -417,7 +428,6 @@ class KubernetesManifestsRequirer(Object):
             return
 
         event.remove_revision()
-
 
 
 class KubernetesManifestRequirerWrapper(Object):
@@ -458,6 +468,11 @@ class KubernetesManifestRequirerWrapper(Object):
                 secret.set_content(secret_content)
             except SecretNotFoundError:
                 secret = self._charm.app.add_secret(content=secret_content, label=secret_label)
+            except ModelError:
+                logger.error(
+                    f"The secret with label {secret_label} could not be accessed by the charm."
+                )
+                raise
             secret.grant(relation=relation)
             relation_data.update({KUBERNETES_MANIFESTS_FIELD: secret.id, IS_SECRET_FIELD: "true"})
 

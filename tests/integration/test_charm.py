@@ -38,7 +38,10 @@ NAMESPACE_FILE = "./tests/integration/resources/namespace.yaml"
 PODDEFAULTS_CRD_TEMPLATE = "./tests/integration/resources/crds/poddefaults.yaml"
 TESTING_LABELS = ["user.kubeflow.org/enabled"]  # Might be more than one in the future
 
-CONTAINERS_SECURITY_CONTEXT_MAP = generate_container_securitycontext_map(METADATA)
+JUJU_USER_ID = 170
+CONTAINERS_SECURITY_CONTEXT_MAP = {
+    "charm": {"runAsUser": JUJU_USER_ID, "runAsGroup": JUJU_USER_ID}
+}
 
 MINIO_SECRET_NAME1 = "mlpipeline-minio-artifact"
 MINIO_SECRET_NAME3 = "mlpipeline-minio-artifact3"

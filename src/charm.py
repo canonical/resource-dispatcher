@@ -46,7 +46,7 @@ class ResourceDispatcherOperator(CharmBase):
         _container_meta = self.meta.containers[self._container_name]
         self.dispatcher_resources_path = _container_meta.mounts[
             next(iter(_container_meta.mounts))
-        ].location
+        ].location + "/resources"
 
         self._context = {
             "app_name": self._name,

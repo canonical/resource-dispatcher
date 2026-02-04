@@ -21,6 +21,7 @@ from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingSta
 from ops.pebble import APIError, ChangeError, Layer
 
 K8S_RESOURCE_FILES = ["src/templates/decorator-controller.yaml.j2"]
+DISPATCHER_RESOURCES_PATH = "/app/resources"
 PODDEFAULTS_RELATION_NAME = "pod-defaults"
 SECRETS_RELATION_NAME = "secrets"
 SERVICEACCOUNTS_RELATION_NAME = "service-accounts"
@@ -42,11 +43,6 @@ class ResourceDispatcherOperator(CharmBase):
         self._namespace_label = self.model.config["target_namespace_label"]
         self._container_name = "resource-dispatcher"
         self._container = self.unit.get_container(self._container_name)
-
-        _container_meta = self.meta.containers[self._container_name]
-        self.dispatcher_resources_path = (
-            _container_meta.mounts[next(iter(_container_meta.mounts))].location + "/resources"
-        )
 
         self._context = {
             "app_name": self._name,
@@ -130,7 +126,7 @@ class ResourceDispatcherOperator(CharmBase):
                         "main.py "
                         f"--port {self._port} "
                         f"--label {self._namespace_label} "
-                        f"--folder {self.dispatcher_resources_path}"
+                        f"--folder {DISPATCHER_RESOURCES_PATH}"
                     ),
                     "startup": "enabled",
                 }
@@ -271,23 +267,23 @@ class ResourceDispatcherOperator(CharmBase):
             self._update_layer()
             self._update_manifests(
                 self._secrets_manifests_provider,
-                f"{self.dispatcher_resources_path}/{SECRETS_RELATION_NAME}",
+                f"{DISPATCHER_RESOURCES_PATH}/{SECRETS_RELATION_NAME}",
             )
             self._update_manifests(
                 self._serviceaccounts_manifests_provider,
-                f"{self.dispatcher_resources_path}/{SERVICEACCOUNTS_RELATION_NAME}",
+                f"{DISPATCHER_RESOURCES_PATH}/{SERVICEACCOUNTS_RELATION_NAME}",
             )
             self._update_manifests(
                 self._poddefaults_manifests_provider,
-                f"{self.dispatcher_resources_path}/{PODDEFAULTS_RELATION_NAME}",
+                f"{DISPATCHER_RESOURCES_PATH}/{PODDEFAULTS_RELATION_NAME}",
             )
             self._update_manifests(
                 self._roles_manifests_provider,
-                f"{self.dispatcher_resources_path}/{ROLES_RELATION_NAME}",
+                f"{DISPATCHER_RESOURCES_PATH}/{ROLES_RELATION_NAME}",
             )
             self._update_manifests(
                 self._rolebindings_manifests_provider,
-                f"{self.dispatcher_resources_path}/{ROLEBINDINGS_RELATION_NAME}",
+                f"{DISPATCHER_RESOURCES_PATH}/{ROLEBINDINGS_RELATION_NAME}",
             )
         except ErrorWithStatus as err:
             self.model.unit.status = err.status

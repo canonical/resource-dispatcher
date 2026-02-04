@@ -10,10 +10,7 @@ import jubilant
 import lightkube
 import pytest
 import yaml
-from charmed_kubeflow_chisme.testing import (
-    assert_security_context,
-    get_pod_names,
-)
+from charmed_kubeflow_chisme.testing import assert_security_context, get_pod_names
 from lightkube.core.exceptions import ApiError
 from lightkube.generic_resource import create_namespaced_resource
 from lightkube.resources.core_v1 import Secret, ServiceAccount

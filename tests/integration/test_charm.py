@@ -12,7 +12,6 @@ import pytest
 import yaml
 from charmed_kubeflow_chisme.testing import (
     assert_security_context,
-    generate_container_securitycontext_map,
     get_pod_names,
 )
 from lightkube.core.exceptions import ApiError

@@ -10,6 +10,11 @@ import jubilant
 import lightkube
 import pytest
 import yaml
+from charmed_kubeflow_chisme.testing import (
+    assert_security_context,
+    generate_container_securitycontext_map,
+    get_pod_names,
+)
 from lightkube.core.exceptions import ApiError
 from lightkube.generic_resource import create_namespaced_resource
 from lightkube.resources.core_v1 import Secret, ServiceAccount
@@ -32,6 +37,8 @@ METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 NAMESPACE_FILE = "./tests/integration/resources/namespace.yaml"
 PODDEFAULTS_CRD_TEMPLATE = "./tests/integration/resources/crds/poddefaults.yaml"
 TESTING_LABELS = ["user.kubeflow.org/enabled"]  # Might be more than one in the future
+
+CONTAINERS_SECURITY_CONTEXT_MAP = generate_container_securitycontext_map(METADATA)
 
 MINIO_SECRET_NAME1 = "mlpipeline-minio-artifact"
 MINIO_SECRET_NAME3 = "mlpipeline-minio-artifact3"
@@ -92,6 +99,28 @@ def test_deploy_resource_dispatcher_charm(juju: jubilant.Juju, resource_dispatch
         .units[f"{RESOURCE_DISPATCHER_CHARM_NAME}/0"]
         .workload_status.current
         == "active"
+    )
+
+
+@pytest.mark.parametrize("container_name", list(CONTAINERS_SECURITY_CONTEXT_MAP.keys()))
+@pytest.mark.abort_on_fail
+def test_container_security_context(
+    juju: jubilant.Juju,
+    lightkube_client: lightkube.Client,
+    container_name: str,
+):
+    """Test that the security context is correctly set for charms and their workloads.
+
+    Verify that all pods' and containers' specs define the expected security contexts, with
+    particular emphasis on user IDs and group IDs.
+    """
+    pod_name = get_pod_names(juju.model, RESOURCE_DISPATCHER_CHARM_NAME)[0]
+    assert_security_context(
+        lightkube_client,
+        pod_name,
+        container_name,
+        CONTAINERS_SECURITY_CONTEXT_MAP,
+        juju.model,
     )
 
 

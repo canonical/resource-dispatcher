@@ -399,10 +399,10 @@ class TestCharm:
 
         with patch.object(
             harness.charm.service_mesh.component._authorization_policy_resource_manager,
-            "mmm",
+            "reconcile",
         ) as mock_reconcile:
             # act:
-            harness.charm.service_mesh.component.mmm()
+            harness.charm.on.install.emit()
 
             # assert:
             mock_reconcile.assert_called_once()

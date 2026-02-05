@@ -114,6 +114,7 @@ def mock_lightkube_client(mocker) -> MagicMock:
     """Mock lightkube Client and _is_patched()."""
     mock_client = MagicMock()
     mocker.patch("components.service_mesh_component.Client", return_value=mock_client)
+    mocker.patch("charms.istio_beacon_k8s.v0.service_mesh.Client", return_value=mock_client)
     return mock_client
 
 

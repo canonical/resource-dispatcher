@@ -406,7 +406,7 @@ class TestCharm:
 
             # assert:
             if relation_exists:
-                mock_reconcile.assert_awaited_once()
+                mock_reconcile.assert_called_once()
                 kwargs = mock_reconcile.call_args.kwargs
                 assert kwargs["policies"] == []
                 assert "mesh_type" in kwargs

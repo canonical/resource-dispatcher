@@ -398,7 +398,7 @@ class TestCharm:
             harness.add_relation_unit(rel_id, "istio-beacon-k8s/0")
 
         with patch.object(
-            harness.charm.service_mesh.component._authorization_policy_resource_manager,
+            harness.charm.ambient_mode_service_mesh.component._authorization_policy_resource_manager,
             "reconcile",
         ) as mock_reconcile:
             # act:
@@ -423,11 +423,11 @@ class TestCharm:
         harness.begin()
 
         with patch.object(
-            harness.charm.service_mesh.component._authorization_policy_resource_manager,
+            harness.charm.ambient_mode_service_mesh.component._authorization_policy_resource_manager,
             "reconcile",
         ) as mock_reconcile:
             # act:
-            harness.charm.service_mesh.component.remove(None)
+            harness.charm.ambient_mode_service_mesh.component.remove(None)
 
             # assert:
             mock_reconcile.assert_called_once()
@@ -463,13 +463,13 @@ class TestCharm:
         harness.add_relation_unit(rel_id, "istio-beacon-k8s/0")
 
         with patch.object(
-            harness.charm.service_mesh.component._authorization_policy_resource_manager,
+            harness.charm.ambient_mode_service_mesh.component._authorization_policy_resource_manager,
             "_validate_raw_policies",
         ) as mock_validate:
             # act (and assert exception raised):
             mock_validate.side_effect = exception_type(exception_msg)
             with pytest.raises(GenericCharmRuntimeError) as exc_info:
-                harness.charm.service_mesh.component.get_status()
+                harness.charm.ambient_mode_service_mesh.component.get_status()
 
             # assert (the rest)
             assert "Error validating raw policies" in str(exc_info.value)

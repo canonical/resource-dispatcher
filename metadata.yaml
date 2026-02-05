@@ -7,6 +7,7 @@ description: |
   Resource Dispatcher charm for injecting Kubernetes resources to desired namespaces.
 summary: |
   Charm responsible for injecting kubernetes object to newly created namespaces.
+charm-user: non-root
 containers:
   resource-dispatcher:
     resource: oci-image

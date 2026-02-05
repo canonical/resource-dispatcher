@@ -10,6 +10,7 @@ import jubilant
 import lightkube
 import pytest
 import yaml
+from charmed_kubeflow_chisme.testing import assert_security_context, get_pod_names
 from lightkube.core.exceptions import ApiError
 from lightkube.generic_resource import create_namespaced_resource
 from lightkube.resources.core_v1 import Secret, ServiceAccount
@@ -33,6 +34,12 @@ PODDEFAULTS_CRD_TEMPLATE = "./tests/integration/crds/poddefaults.yaml"
 TESTING_LABELS = ["user.kubeflow.org/enabled"]  # Might be more than one in the future
 SECRET_NAME = "mlpipeline-minio-artifact"
 SERVICE_ACCOUNT_NAME = MANIFESTS_TESTER_CONFIG["options"]["service_account_name"]["default"]
+
+JUJU_USER_ID = 170
+CONTAINERS_SECURITY_CONTEXT_MAP = {
+    "charm": {"runAsUser": JUJU_USER_ID, "runAsGroup": JUJU_USER_ID}
+}
+
 TESTER1_SECRET_NAMES = ["mlpipeline-minio-artifact", "seldon-rclone-secret"]
 TESTER2_SECRET_NAMES = ["mlpipeline-minio-artifact2", "seldon-rclone-secret2"]
 PODDEFAULTS_NAMES = ["access-minio", "mlflow-server-minio"]
@@ -62,6 +69,28 @@ def test_build_and_deploy_dispatcher_charm(juju: jubilant.Juju, resource_dispatc
         lambda status: jubilant.all_active(status) and jubilant.all_agents_idle(status), delay=5
     )
     assert status.apps[CHARM_NAME].units[f"{CHARM_NAME}/0"].workload_status.current == "active"
+
+
+@pytest.mark.parametrize("container_name", list(CONTAINERS_SECURITY_CONTEXT_MAP.keys()))
+@pytest.mark.abort_on_fail
+def test_container_security_context(
+    juju: jubilant.Juju,
+    lightkube_client: lightkube.Client,
+    container_name: str,
+):
+    """Test that the security context is correctly set for charms and their workloads.
+
+    Verify that all pods' and containers' specs define the expected security contexts, with
+    particular emphasis on user IDs and group IDs.
+    """
+    pod_name = get_pod_names(juju.model, RESOURCE_DISPATCHER_CHARM_NAME)[0]
+    assert_security_context(
+        lightkube_client,
+        pod_name,
+        container_name,
+        CONTAINERS_SECURITY_CONTEXT_MAP,
+        juju.model,
+    )
 
 
 def test_build_and_deploy_helper_charms(juju: jubilant.Juju, manifest_tester_charm: Path):

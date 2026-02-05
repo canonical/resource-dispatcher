@@ -406,6 +406,7 @@ class TestCharm:
 
             # assert:
             len(mock_reconcile.call_args_list) == expected_call_count
+            raise Exception(str(mock_reconcile.call_args_list))
             if relation_exists:
                 kwargs = mock_reconcile.call_args.kwargs
                 assert kwargs["policies"] == []

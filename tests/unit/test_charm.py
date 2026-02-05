@@ -403,7 +403,7 @@ class TestCharm:
                     SERVICE_MESH_RELATION_ENDPOINT, SERVICE_MESH_RELATION_PROVIDER
                 )
                 harness.add_relation_unit(rel_id, f"{SERVICE_MESH_RELATION_PROVIDER}/0")
-            harness.charm.on.install.emit()
+                harness.charm.on[SERVICE_MESH_RELATION_ENDPOINT].relation_joined.emit()
 
             # assert:
             len(mock_reconcile.call_args_list) == expected_call_count

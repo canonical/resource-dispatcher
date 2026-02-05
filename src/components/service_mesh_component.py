@@ -69,6 +69,10 @@ class ServiceMeshComponent(Component):
 
         return ActiveStatus()
 
+    def mmm(self):
+        self._authorization_policy_resource_manager.mmm()
+
+
     def _configure_app_leader(self, event):
         """Ensure the allow-all AuthorizationPolicies is in place (only) when in ambient mode."""
         policies = []

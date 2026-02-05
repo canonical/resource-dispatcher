@@ -17,7 +17,7 @@ from lightkube.resources.core_v1 import Secret, ServiceAccount
 from lightkube.resources.rbac_authorization_v1 import Role, RoleBinding
 
 from .charms_dependencies import METACONTROLLER_OPERATOR
-from .helpers import deploy_k8s_resources
+from .helpers import RESOURCE_DISPATCHER_CHARM_NAME, deploy_k8s_resources
 
 logger = logging.getLogger(__name__)
 

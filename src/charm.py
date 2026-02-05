@@ -340,14 +340,13 @@ class ResourceDispatcherOperator(CharmBase):
 
     @property
     def ambient_mesh_enabled(self) -> bool:
-        """Whether the relation with the ambient-mode service-mesh provider is setup.
-        """
+        """Whether the relation with the ambient-mode service-mesh provider is setup."""
         if self.model.get_relation(self._service_mesh_relation_name):
             return True
         return False
 
     def _on_service_mesh_relation_events(self, event: EventBase) -> None:
-        """..."""
+        """Update AuthorizationPolicies according to service-mesh relation changes."""
         # verifying that the defined AuthorizationPolicy is valid (i.e. supported):
         try:
             self._authorization_policy_resource_manager._validate_raw_policies(

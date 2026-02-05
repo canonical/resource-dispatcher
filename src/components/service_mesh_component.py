@@ -36,7 +36,7 @@ class ServiceMeshComponent(Component):
             self._charm.on[self._service_mesh_relation_name].relation_broken,
         ]
 
-        self._policy_resource_manager = PolicyResourceManager(
+        self._authorization_policy_resource_manager = PolicyResourceManager(
             charm=self._charm,
             lightkube_client=Client(
                 field_manager=f"{self._app_name}-{self._app_namespace}"
@@ -58,7 +58,7 @@ class ServiceMeshComponent(Component):
         if self.ambient_mesh_enabled:
             try:
                 # verifying that the defined AuthorizationPolicy is valid (i.e. supported):
-                self._policy_resource_manager._validate_raw_policies(
+                self._authorization_policy_resource_manager._validate_raw_policies(
                     [self._allow_all_to_workload_authorization_policy]
                 )
 
@@ -77,13 +77,13 @@ class ServiceMeshComponent(Component):
         else:
             logger.info("Ambient mode disabled, removing the allow-all policy...")
 
-        self._policy_resource_manager.reconcile(
+        self._authorization_policy_resource_manager.reconcile(
             policies=[], mesh_type=MeshType.istio, raw_policies=policies
         )
 
     def remove(self, event):
         """Remove all AuthorizationPolicies that target the workload, on charm removal."""
-        self._policy_resource_manager.reconcile(
+        self._authorization_policy_resource_manager.reconcile(
             policies=[], mesh_type=MeshType.istio, raw_policies=[]
         )
 

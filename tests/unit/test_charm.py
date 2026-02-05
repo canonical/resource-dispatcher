@@ -431,7 +431,7 @@ class TestCharm:
             "reconcile",
         ) as mock_reconcile:
             # act:
-            harness.charm._on_remove()
+            harness.charm.on.remove.emit()
 
             # assert:
             mock_reconcile.assert_called_once()

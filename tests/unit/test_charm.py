@@ -405,15 +405,12 @@ class TestCharm:
             harness.charm.service_mesh.component._configure_app_leader()
 
             # assert:
-            if relation_exists:
-                mock_reconcile.assert_called_once()
-                kwargs = mock_reconcile.call_args.kwargs
-                assert kwargs["policies"] == []
-                assert "mesh_type" in kwargs
-                assert "raw_policies" in kwargs
-                assert len(kwargs["raw_policies"]) == expected_policy_count
-            else:
-                mock_reconcile.assert_not_called()
+            mock_reconcile.assert_called_once()
+            kwargs = mock_reconcile.call_args.kwargs
+            assert kwargs["policies"] == []
+            assert "mesh_type" in kwargs
+            assert "raw_policies" in kwargs
+            assert len(kwargs["raw_policies"]) == expected_policy_count
 
     @patch(
         "charm.KubernetesServicePatch",

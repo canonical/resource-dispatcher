@@ -396,15 +396,16 @@ class TestCharm:
                 SERVICE_MESH_RELATION_ENDPOINT, SERVICE_MESH_RELATION_PROVIDER
             )
             harness.add_relation_unit(rel_id, f"{SERVICE_MESH_RELATION_PROVIDER}/0")
-            relation = harness.charm.framework.model.get_relation(
-                SERVICE_MESH_RELATION_ENDPOINT, rel_id
-            )
 
         with patch.object(
             harness.charm._authorization_policy_resource_manager, "reconcile"
         ) as mock_reconcile:
             # act:
+            relation = harness.charm.framework.model.get_relation(
+                SERVICE_MESH_RELATION_ENDPOINT, rel_id
+            )
             harness.charm.on[SERVICE_MESH_RELATION_ENDPOINT].relation_changed.emit(relation)
+            harness.begin_with_initial_hooks()
 
             # assert:
             mock_reconcile.assert_called_once()
@@ -465,9 +466,6 @@ class TestCharm:
             SERVICE_MESH_RELATION_ENDPOINT, SERVICE_MESH_RELATION_PROVIDER
         )
         harness.add_relation_unit(rel_id, f"{SERVICE_MESH_RELATION_PROVIDER}/0")
-        relation = harness.charm.framework.model.get_relation(
-            SERVICE_MESH_RELATION_ENDPOINT, rel_id
-        )
 
         with patch.object(
             harness.charm._authorization_policy_resource_manager,
@@ -476,7 +474,11 @@ class TestCharm:
             # act (and assert exception raised):
             mock_validate.side_effect = exception_type(exception_msg)
             with pytest.raises(GenericCharmRuntimeError) as exc_info:
+                relation = harness.charm.framework.model.get_relation(
+                    SERVICE_MESH_RELATION_ENDPOINT, rel_id
+                )
                 harness.charm.on[SERVICE_MESH_RELATION_ENDPOINT].relation_changed.emit(relation)
+                harness.begin_with_initial_hooks()
 
             # assert (the rest)
             assert "Error validating raw policies" in str(exc_info.value)

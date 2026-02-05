@@ -377,7 +377,10 @@ class TestCharm:
 
     @pytest.mark.parametrize("relation_exists", [True, False])
     def test_service_mesh_prm_reconcile_called(
-        self, harness, mock_kubernetes_service_patch, relation_exists,
+        self,
+        harness,
+        mock_kubernetes_service_patch,
+        relation_exists,
     ):
         """Test PolicyResourceManager.reconcile called with correct policies based on relation."""
         # arrange:
@@ -385,12 +388,15 @@ class TestCharm:
         harness.set_leader(True)
         harness.begin()
         if relation_exists:
-            rel_id = harness.add_relation(SERVICE_MESH_RELATION_ENDPOINT, SERVICE_MESH_RELATION_PROVIDER)
+            rel_id = harness.add_relation(
+                SERVICE_MESH_RELATION_ENDPOINT,
+                SERVICE_MESH_RELATION_PROVIDER
+            )
             harness.add_relation_unit(rel_id, "istio-beacon-k8s/0")
 
         with patch.object(
             harness.charm.service_mesh.component._authorization_policy_resource_manager,
-            "reconcile"
+            "reconcile",
         ) as mock_reconcile:
             # act:
             harness.charm.on.install.emit()
@@ -403,7 +409,6 @@ class TestCharm:
             assert "raw_policies" in kwargs
             assert len(kwargs["raw_policies"]) == expected_policy_count
 
-
     def test_service_mesh_prm_remove_called(self, harness, mock_kubernetes_service_patch):
         """Test that PolicyResourceManager.reconcile is called with empty policies on remove."""
         # arrange:
@@ -412,7 +417,7 @@ class TestCharm:
 
         with patch.object(
             harness.charm.service_mesh.component._authorization_policy_resource_manager,
-            "reconcile"
+            "reconcile",
         ) as mock_reconcile:
             # act:
             harness.charm.service_mesh.component.remove(None)
@@ -422,7 +427,6 @@ class TestCharm:
             kwargs = mock_reconcile.call_args.kwargs
             assert kwargs["policies"] == []
             assert kwargs["raw_policies"] == []
-
 
     @pytest.mark.parametrize(
         "exception_type,exception_msg",
@@ -442,12 +446,15 @@ class TestCharm:
         # arrange:
         harness.set_leader(True)
         harness.begin()
-        rel_id = harness.add_relation(SERVICE_MESH_RELATION_ENDPOINT, SERVICE_MESH_RELATION_PROVIDER)
+        rel_id = harness.add_relation(
+            SERVICE_MESH_RELATION_ENDPOINT,
+            SERVICE_MESH_RELATION_PROVIDER
+        )
         harness.add_relation_unit(rel_id, "istio-beacon-k8s/0")
 
         with patch.object(
             harness.charm.service_mesh.component._authorization_policy_resource_manager,
-            "_validate_raw_policies"
+            "_validate_raw_policies",
         ) as mock_validate:
             # act (and assert exception raised):
             mock_validate.side_effect = exception_type(exception_msg)

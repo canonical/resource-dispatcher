@@ -25,8 +25,7 @@ class ServiceMeshComponent(Component):
         self._service_mesh_relation_name = "service-mesh"
 
         self._mesh = ServiceMeshConsumer(
-            self._charm,
-            policies=None  # custom AuthorizationPolicies managed below
+            self._charm, policies=None  # custom AuthorizationPolicies managed below
         )
 
         # to update AuthorizationPolicies when the ambient-mode relation with the service mesh

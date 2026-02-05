@@ -20,7 +20,7 @@ from lightkube.generic_resource import create_namespaced_resource
 from lightkube.resources.core_v1 import Secret, ServiceAccount
 from lightkube.resources.rbac_authorization_v1 import Role, RoleBinding
 
-from .charms_dependencies import METACONTROLLER_OPERATOR
+from .charms_dependencies import ISTIO_BEACON_K8S, ISTIO_K8S, METACONTROLLER_OPERATOR
 from .helpers import RESOURCE_DISPATCHER_CHARM_NAME, deploy_k8s_resources
 
 logger = logging.getLogger(__name__)
@@ -48,6 +48,8 @@ SERVICE_ACCOUNT_NAME3 = "config-secret-3"
 
 SERVICE_ACCOUNT_NAME1_NEW = SERVICE_ACCOUNT_NAME1 + "-new"
 SERVICE_ACCOUNT_NAME3_NEW = SERVICE_ACCOUNT_NAME3 + "-new"
+
+SERVICE_MESH_ENDPOINT = "service-mesh"
 
 
 TESTER1_SECRET_NAMES = ["mlpipeline-minio-artifact", "seldon-rclone-secret"]
@@ -100,6 +102,27 @@ def test_deploy_resource_dispatcher_charm(juju: jubilant.Juju, resource_dispatch
         .workload_status.current
         == "active"
     )
+
+
+def test_ambient_mesh_integration(juju: jubilant.Juju):
+    """Deploy Istio in ambient mode and integrate it with resource-dispatcher."""
+    # deploying charms that provide the ambient-mode service mesh:
+    for charm in (ISTIO_K8S, ISTIO_BEACON_K8S):
+        juju.deploy(
+            charm=charm.charm,
+            channel=charm.channel,
+            config=charm.config,
+            trust=charm.trust,
+        )
+        juju.wait(lambda status: status.apps[charm.charm].is_active)
+
+    # integrating resource-dispatcher with the service mesh:
+    juju.integrate(
+        f"{ISTIO_BEACON_K8S.charm}:{SERVICE_MESH_ENDPOINT}",
+        f"{RESOURCE_DISPATCHER_CHARM_NAME}:{SERVICE_MESH_ENDPOINT}",
+    )
+    logger.info("Waiting for resource-dispatcher to be active after entering the service mesh...")
+    juju.wait(lambda status: status.apps[RESOURCE_DISPATCHER_CHARM_NAME].is_active)
 
 
 @pytest.mark.parametrize("container_name", list(CONTAINERS_SECURITY_CONTEXT_MAP.keys()))

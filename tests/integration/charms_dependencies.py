@@ -8,3 +8,7 @@ METACONTROLLER_OPERATOR = CharmSpec(
 RESOURCE_DISPATCHER_NO_SECRET = CharmSpec(
     charm="resource-dispatcher", channel="2.0/stable", trust=True
 )
+
+# for Istio in ambient mode:
+ISTIO_BEACON_K8S = CharmSpec(charm="istio-beacon-k8s", channel="2/edge", trust=True)
+ISTIO_K8S = CharmSpec(charm="istio-k8s", channel="2/edge", trust=True, config={"platform": ""})

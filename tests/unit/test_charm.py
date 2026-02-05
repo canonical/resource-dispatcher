@@ -374,6 +374,10 @@ class TestCharm:
         harness.charm.on.upgrade_charm.emit()
         deploy_k8s_resources.assert_called_once()
 
+    @patch(
+        "charm.KubernetesServicePatch",
+        lambda x, y, service_name, service_type, refresh_event: None,
+    )
     @pytest.mark.parametrize("relation_exists", [True, False])
     def test_service_mesh_prm_reconcile_called(
         self,
@@ -407,6 +411,10 @@ class TestCharm:
             assert "raw_policies" in kwargs
             assert len(kwargs["raw_policies"]) == expected_policy_count
 
+    @patch(
+        "charm.KubernetesServicePatch",
+        lambda x, y, service_name, service_type, refresh_event: None,
+    )
     def test_service_mesh_prm_remove_called(self, harness, mock_lightkube_client: MagicMock):
         """Test that PolicyResourceManager.reconcile is called with empty policies on remove."""
         # arrange:
@@ -426,6 +434,10 @@ class TestCharm:
             assert kwargs["policies"] == []
             assert kwargs["raw_policies"] == []
 
+    @patch(
+        "charm.KubernetesServicePatch",
+        lambda x, y, service_name, service_type, refresh_event: None,
+    )
     @pytest.mark.parametrize(
         "exception_type,exception_msg",
         [

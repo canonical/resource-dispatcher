@@ -379,7 +379,7 @@ class TestCharm:
     def test_service_mesh_prm_reconcile_called(
         self,
         harness,
-        mock_kubernetes_service_patch,
+        mock_lightkube_client: MagicMock,
         relation_exists,
     ):
         """Test PolicyResourceManager.reconcile called with correct policies based on relation."""
@@ -409,7 +409,7 @@ class TestCharm:
             assert "raw_policies" in kwargs
             assert len(kwargs["raw_policies"]) == expected_policy_count
 
-    def test_service_mesh_prm_remove_called(self, harness, mock_kubernetes_service_patch):
+    def test_service_mesh_prm_remove_called(self, harness, mock_lightkube_client: MagicMock):
         """Test that PolicyResourceManager.reconcile is called with empty policies on remove."""
         # arrange:
         harness.set_leader(True)
@@ -438,7 +438,7 @@ class TestCharm:
     def test_service_mesh_get_status_error_handling(
         self,
         harness,
-        mock_kubernetes_service_patch,
+        mock_lightkube_client: MagicMock,
         exception_type,
         exception_msg,
     ):

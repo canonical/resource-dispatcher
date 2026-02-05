@@ -20,6 +20,8 @@ class ServiceMeshComponent(Component):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+        self._app_name = self._charm.app.name
+        self._app_namespace = self._charm.model.name
         self._service_mesh_relation_name = "service-mesh"
 
         self._mesh = ServiceMeshConsumer(
@@ -37,19 +39,19 @@ class ServiceMeshComponent(Component):
         self._policy_resource_manager = PolicyResourceManager(
             charm=self._charm,
             lightkube_client=Client(
-                field_manager=f"{self._charm.app.name}-{self._charm.model.name}"
+                field_manager=f"{self._app_name}-{self._app_namespace}"
             ),
             labels={
-                "app.kubernetes.io/instance": f"{self._charm.app.name}-{self._charm.model.name}",
-                "kubernetes-resource-handler-scope": f"{self._charm.app.name}-allow-all",
+                "app.kubernetes.io/instance": f"{self._app_name}-{self._app_namespace}",
+                "kubernetes-resource-handler-scope": f"{self._app_name}-allow-all",
             },
             logger=logger,
         )
 
         # an AuthorizationPolicy that allows any incoming traffic to the workload:
         self._allow_all_to_workload_authorization_policy = generate_allow_all_authorization_policy(
-            app_name=self._charm.app.name,
-            namespace=self._charm.model.name,
+            app_name=self._app_name,
+            namespace=self._app_namespace,
         )
 
     def get_status(self) -> StatusBase:

@@ -392,20 +392,21 @@ class TestCharm:
         # arrange:
         expected_policy_count = int(relation_exists)
         harness.begin()
+        if relation_exists:
+            rel_id = harness.add_relation(
+                SERVICE_MESH_RELATION_ENDPOINT, SERVICE_MESH_RELATION_PROVIDER
+            )
+            harness.add_relation_unit(rel_id, f"{SERVICE_MESH_RELATION_PROVIDER}/0")
+            # relation = harness.charm.framework.model.get_relation(
+            #     SERVICE_MESH_RELATION_ENDPOINT, rel_id
+            # )
+            # harness.charm.on.service_mesh_relation_changed.emit(relation)
 
         with patch.object(
             harness.charm._authorization_policy_resource_manager, "reconcile"
         ) as mock_reconcile:
             # act:
-            if relation_exists:
-                rel_id = harness.add_relation(
-                    SERVICE_MESH_RELATION_ENDPOINT, SERVICE_MESH_RELATION_PROVIDER
-                )
-                harness.add_relation_unit(rel_id, f"{SERVICE_MESH_RELATION_PROVIDER}/0")
-                relation = harness.charm.framework.model.get_relation(
-                    SERVICE_MESH_RELATION_ENDPOINT, rel_id
-                )
-                harness.charm.on.service_mesh_relation_changed.emit(relation)
+            harness.charm.on.install.emit()
 
             # assert:
             mock_reconcile.assert_called_once()

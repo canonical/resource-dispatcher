@@ -103,10 +103,14 @@ def harness() -> Harness:
 
     harness = Harness(ResourceDispatcherOperator)
 
+    harness.set_leader(True)
+
     # setup container networking simulation
     harness.set_can_connect("resource-dispatcher", True)
 
-    return harness
+    yield harness
+
+    harness.cleanup()
 
 
 @pytest.fixture(autouse=True)
@@ -146,6 +150,7 @@ class TestCharm:
         harness: Harness,
         mock_lightkube_client: MagicMock,
     ):
+        harness.set_leader(False)
         harness.begin()
         with pytest.raises(ErrorWithStatus) as e_info:
             harness.charm._check_leader()
@@ -163,7 +168,6 @@ class TestCharm:
         harness: Harness,
         mock_lightkube_client: MagicMock,
     ):
-        harness.set_leader(True)
         harness.begin()
         try:
             harness.charm._check_leader()
@@ -295,7 +299,6 @@ class TestCharm:
     )
     def test_get_manifests_success(self, harness: Harness, mock_lightkube_client: MagicMock):
         harness = add_secret_relation_to_harness(harness)
-        harness.set_leader(True)
         harness.begin()
         secrets = harness.charm._secrets_manifests_provider.get_manifests()
         assert secrets == [SECRET1, SECRET2]
@@ -389,7 +392,6 @@ class TestCharm:
         """Test PolicyResourceManager.reconcile called with correct policies based on relation."""
         # arrange:
         expected_policy_count = int(relation_exists)
-        harness.set_leader(True)
         harness.begin()
         if relation_exists:
             rel_id = harness.add_relation(
@@ -424,7 +426,6 @@ class TestCharm:
     def test_service_mesh_prm_remove_called(self, harness, mock_lightkube_client: MagicMock):
         """Test that PolicyResourceManager.reconcile is called with empty policies on remove."""
         # arrange:
-        harness.set_leader(True)
         harness.begin()
 
         with patch.object(
@@ -462,7 +463,6 @@ class TestCharm:
     ):
         """Test AuthorizationPolicy raises exceptions on validation errors."""
         # arrange:
-        harness.set_leader(True)
         harness.begin()
         rel_id = harness.add_relation(
             SERVICE_MESH_RELATION_ENDPOINT, SERVICE_MESH_RELATION_PROVIDER

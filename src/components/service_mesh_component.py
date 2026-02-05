@@ -38,9 +38,7 @@ class ServiceMeshComponent(Component):
 
         self._authorization_policy_resource_manager = PolicyResourceManager(
             charm=self._charm,
-            lightkube_client=Client(
-                field_manager=f"{self._app_name}-{self._app_namespace}"
-            ),
+            lightkube_client=Client(field_manager=f"{self._app_name}-{self._app_namespace}"),
             labels={
                 "app.kubernetes.io/instance": f"{self._app_name}-{self._app_namespace}",
                 "kubernetes-resource-handler-scope": f"{self._app_name}-allow-all",

@@ -406,7 +406,7 @@ class TestCharm:
             harness.charm.on.install.emit()
 
             # assert:
-            len(mock_reconcile.mock_calls) == expected_call_count
+            len(mock_reconcile.call_args_list) == expected_call_count
             if relation_exists:
                 kwargs = mock_reconcile.call_args.kwargs
                 assert kwargs["policies"] == []

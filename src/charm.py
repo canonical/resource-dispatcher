@@ -105,7 +105,7 @@ class ResourceDispatcherOperator(CharmBase):
         )
 
         self.service_mesh = self.charm_reconciler.add(
-            component=ServiceMeshComponent(charm=self, name="ambient-mode-service-mesh"),
+            component=ServiceMeshComponent(charm=self, name="service-mesh"),
             depends_on=[self.leadership_gate],
         )
 

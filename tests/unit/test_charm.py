@@ -422,7 +422,7 @@ class TestCharm:
         harness.begin()
 
         with patch.object(
-            harness.charm.service_mesh.component._authorization_policy_resource_manager,
+            harness.charm._authorization_policy_resource_manager,
             "reconcile",
         ) as mock_reconcile:
             # act:
@@ -462,7 +462,7 @@ class TestCharm:
         harness.add_relation_unit(rel_id, f"{SERVICE_MESH_RELATION_PROVIDER}/0")
 
         with patch.object(
-            harness.charm.service_mesh.component._authorization_policy_resource_manager,
+            harness.charm._authorization_policy_resource_manager,
             "_validate_raw_policies",
         ) as mock_validate:
             # act (and assert exception raised):

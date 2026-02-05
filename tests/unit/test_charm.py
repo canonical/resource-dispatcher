@@ -106,6 +106,14 @@ def harness() -> Harness:
     return harness
 
 
+@pytest.fixture(autouse=True)
+def mock_lightkube_client(mocker) -> MagicMock:
+    """Mock lightkube Client and _is_patched()."""
+    mock_client = MagicMock()
+    mocker.patch("components.service_mesh_component.Client", return_value=mock_client)
+    return mock_client
+
+
 def add_secret_relation_to_harness(harness: Harness) -> Harness:
     """Helper function to handle secret relation"""
     secret_manifests = [
@@ -129,7 +137,12 @@ class TestCharm:
         lambda x, y, service_name, service_type, refresh_event: None,
     )
     @patch("charm.ResourceDispatcherOperator.k8s_resource_handler")
-    def test_check_leader_failure(self, _: MagicMock, harness: Harness):
+    def test_check_leader_failure(
+        self,
+        _: MagicMock,
+        harness: Harness,
+        mock_lightkube_client: MagicMock,
+    ):
         harness.begin()
         with pytest.raises(ErrorWithStatus) as e_info:
             harness.charm._check_leader()
@@ -141,7 +154,12 @@ class TestCharm:
         lambda x, y, service_name, service_type, refresh_event: None,
     )
     @patch("charm.ResourceDispatcherOperator.k8s_resource_handler")
-    def test_check_leader_success(self, _: MagicMock, harness: Harness):
+    def test_check_leader_success(
+        self,
+        _: MagicMock,
+        harness: Harness,
+        mock_lightkube_client: MagicMock,
+    ):
         harness.set_leader(True)
         harness.begin()
         try:
@@ -154,7 +172,12 @@ class TestCharm:
         lambda x, y, service_name, service_type, refresh_event: None,
     )
     @patch("charm.ResourceDispatcherOperator._deploy_k8s_resources")
-    def test_on_install_success(self, deploy_k8s_resources: MagicMock, harness: Harness):
+    def test_on_install_success(
+        self,
+        deploy_k8s_resources: MagicMock,
+        harness: Harness,
+        mock_lightkube_client: MagicMock,
+    ):
         harness.begin()
         harness.charm._on_install(None)
         deploy_k8s_resources.assert_called()
@@ -168,6 +191,7 @@ class TestCharm:
         self,
         container: MagicMock,
         harness: Harness,
+        mock_lightkube_client: MagicMock,
     ):
         change = MagicMock()
         change.tasks = []
@@ -185,6 +209,7 @@ class TestCharm:
     def test_update_layer_success(
         self,
         harness: Harness,
+        mock_lightkube_client: MagicMock,
     ):
         harness.begin()
         harness.charm._update_layer()
@@ -195,7 +220,12 @@ class TestCharm:
         lambda x, y, service_name, service_type, refresh_event: None,
     )
     @patch("charm.ResourceDispatcherOperator.k8s_resource_handler")
-    def test_deploy_k8s_resources_failure(self, k8s_handler: MagicMock, harness: Harness):
+    def test_deploy_k8s_resources_failure(
+        self,
+        k8s_handler: MagicMock,
+        harness: Harness,
+        mock_lightkube_client: MagicMock,
+    ):
         k8s_handler.apply.side_effect = _FakeApiError()
         harness.begin()
         with pytest.raises(GenericCharmRuntimeError) as exc_info:
@@ -208,7 +238,12 @@ class TestCharm:
         lambda x, y, service_name, service_type, refresh_event: None,
     )
     @patch("charm.ResourceDispatcherOperator.k8s_resource_handler")
-    def test_deploy_k8s_resources_success(self, k8s_handler: MagicMock, harness: Harness):
+    def test_deploy_k8s_resources_success(
+        self,
+        k8s_handler: MagicMock,
+        harness: Harness,
+        mock_lightkube_client: MagicMock,
+    ):
         harness.begin()
         harness.charm._deploy_k8s_resources()
         k8s_handler.apply.assert_called()
@@ -222,7 +257,13 @@ class TestCharm:
     )
     @patch("charm.ResourceDispatcherOperator.k8s_resource_handler")
     @patch("charm.delete_many")
-    def test_on_remove_failure(self, delete_many: MagicMock, _: MagicMock, harness: Harness):
+    def test_on_remove_failure(
+        self,
+        delete_many: MagicMock,
+        _: MagicMock,
+        harness: Harness,
+        mock_lightkube_client: MagicMock,
+    ):
         delete_many.side_effect = _FakeApiError()
         harness.begin()
         with pytest.raises(ApiError):
@@ -234,7 +275,13 @@ class TestCharm:
     )
     @patch("charm.ResourceDispatcherOperator.k8s_resource_handler")
     @patch("charm.delete_many")
-    def test_on_remove_success(self, delete_many: MagicMock, _: MagicMock, harness: Harness):
+    def test_on_remove_success(
+        self,
+        delete_many: MagicMock,
+        _: MagicMock,
+        harness: Harness,
+        mock_lightkube_client: MagicMock,
+    ):
         harness.begin()
         harness.charm._on_remove(None)
         assert harness.charm.model.unit.status == MaintenanceStatus("K8S resources removed")
@@ -243,7 +290,7 @@ class TestCharm:
         "charm.KubernetesServicePatch",
         lambda x, y, service_name, service_type, refresh_event: None,
     )
-    def test_get_manifests_success(self, harness: Harness):
+    def test_get_manifests_success(self, harness: Harness, mock_lightkube_client: MagicMock):
         harness = add_secret_relation_to_harness(harness)
         harness.set_leader(True)
         harness.begin()
@@ -254,7 +301,7 @@ class TestCharm:
         "charm.KubernetesServicePatch",
         lambda x, y, service_name, service_type, refresh_event: None,
     )
-    def test_manifests_valid_true(self, harness: Harness):
+    def test_manifests_valid_true(self, harness: Harness, mock_lightkube_client: MagicMock):
         harness.begin()
         response = harness.charm._manifests_valid(VALID_MANIFESTS)
         assert response == True
@@ -263,7 +310,7 @@ class TestCharm:
         "charm.KubernetesServicePatch",
         lambda x, y, service_name, service_type, refresh_event: None,
     )
-    def test_manifests_valid_false(self, harness: Harness):
+    def test_manifests_valid_false(self, harness: Harness, mock_lightkube_client: MagicMock):
         harness.begin()
         response = harness.charm._manifests_valid(INVALID_MANIFESTS)
         assert response == False
@@ -275,7 +322,11 @@ class TestCharm:
     @patch("charm.ResourceDispatcherOperator.secrets_manifests_provider")
     @patch("charm.ResourceDispatcherOperator._sync_manifests")
     def test_update_manifests_success(
-        self, sync_manifests: MagicMock, secrets_manifests_provider: MagicMock, harness: Harness
+        self,
+        sync_manifests: MagicMock,
+        secrets_manifests_provider: MagicMock,
+        harness: Harness,
+        mock_lightkube_client: MagicMock,
     ):
         harness.begin()
         secrets_manifests_provider.get_manifests.return_value = ""
@@ -295,6 +346,7 @@ class TestCharm:
         _: MagicMock,
         secrets_manifests_provider: MagicMock,
         harness: Harness,
+        mock_lightkube_client: MagicMock,
     ):
         manifests_valid.return_value = False
         secrets_manifests_provider.get_manifests.return_value = ""
@@ -310,7 +362,10 @@ class TestCharm:
     )
     @patch("charm.ResourceDispatcherOperator._deploy_k8s_resources")
     def test_charm_upgrade_calls_deploy_k8s_resources(
-        self, deploy_k8s_resources: MagicMock, harness: Harness
+        self,
+        deploy_k8s_resources: MagicMock,
+        harness: Harness,
+        mock_lightkube_client: MagicMock,
     ):
         harness.begin()
         harness.charm.on.upgrade_charm.emit()

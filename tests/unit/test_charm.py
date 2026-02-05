@@ -388,8 +388,7 @@ class TestCharm:
     ):
         """Test PolicyResourceManager.reconcile called with correct policies based on relation."""
         # arrange:
-        expected_call_count = int(relation_exists)
-        expected_policy_count = expected_call_count
+        expected_policy_count = int(relation_exists)
         harness.set_leader(True)
         if relation_exists:
             rel_id = harness.add_relation(

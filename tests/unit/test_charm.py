@@ -151,9 +151,8 @@ class TestCharm:
         mock_lightkube_client: MagicMock,
     ):
         harness.set_leader(False)
-        harness.begin()
         with pytest.raises(ErrorWithStatus) as e_info:
-            harness.charm._check_leader()
+            harness.begin()
         assert "Waiting for leadership" in str(e_info)
         assert e_info.value.status_type(WaitingStatus)
 

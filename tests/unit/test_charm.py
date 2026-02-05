@@ -402,7 +402,7 @@ class TestCharm:
             "reconcile",
         ) as mock_reconcile:
             # act:
-            harness.charm.on.install.emit()
+            harness.charm.service_mesh.component._configure_app_leader(None)
 
             # assert:
             mock_reconcile.assert_called_once()

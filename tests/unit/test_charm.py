@@ -406,7 +406,7 @@ class TestCharm:
                     SERVICE_MESH_RELATION_ENDPOINT, rel_id
                 )
                 harness.charm.on[SERVICE_MESH_RELATION_ENDPOINT].relation_changed.emit(relation)
-            harness.charm.on.install.emit()
+            harness.charm._authorization_policy_resource_manager.reconcile()
 
             # assert:
             mock_reconcile.assert_called_once()

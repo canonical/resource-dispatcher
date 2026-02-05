@@ -105,38 +105,39 @@ class ResourceDispatcherOperator(CharmBase):
 
         # for an ambient-mode service mesh:
 
-        self._mesh = ServiceMeshConsumer(
-            self, policies=None  # custom AuthorizationPolicies managed below
-        )
+        if self.unit.is_leader():
+            self._mesh = ServiceMeshConsumer(
+                self, policies=None  # custom AuthorizationPolicies managed below
+            )
 
-        self._authorization_policy_resource_manager = PolicyResourceManager(
-            charm=self,
-            lightkube_client=Client(field_manager=f"{self._app_name}-{self._namespace}"),
-            labels={
-                "app.kubernetes.io/instance": f"{self._app_name}-{self._namespace}",
-                "kubernetes-resource-handler-scope": f"{self._app_name}-allow-all",
-            },
-            logger=self.logger,
-        )
+            self._authorization_policy_resource_manager = PolicyResourceManager(
+                charm=self,
+                lightkube_client=Client(field_manager=f"{self._app_name}-{self._namespace}"),
+                labels={
+                    "app.kubernetes.io/instance": f"{self._app_name}-{self._namespace}",
+                    "kubernetes-resource-handler-scope": f"{self._app_name}-allow-all",
+                },
+                logger=self.logger,
+            )
 
-        # to update AuthorizationPolicies when the ambient-mode relation with the service mesh
-        # provider is updated:
-        for event in (
-            self.on[self._service_mesh_relation_name].relation_changed,
-            self.on[self._service_mesh_relation_name].relation_broken,
-        ):
-            self.framework.observe(event, self._on_service_mesh_relation_events)
+            # to update AuthorizationPolicies when the ambient-mode relation with the service mesh
+            # provider is updated:
+            for event in (
+                self.on[self._service_mesh_relation_name].relation_changed,
+                self.on[self._service_mesh_relation_name].relation_broken,
+            ):
+                self.framework.observe(event, self._on_service_mesh_relation_events)
 
-        # NOTE: a custom AuthorizationPolicy that allows any incoming traffic to the workload is
-        # defined here (and applied below) because it is required to receive API calls from
-        # Metacontroller, whose webhook Resource Dispatcher implements, as Metacontroller does not
-        # have Juju relations with Resource Dispatcher (yet, at the time of writing) and is
-        # therefore not possible to allow traffic from one to the other via neither the AppPolicy
-        # nor the UnitPolicy by istio_beacon_k8s.v0.service_mesh
-        self._allow_all_to_workload_authorization_policy = generate_allow_all_authorization_policy(
-            app_name=self._app_name,
-            namespace=self._namespace,
-        )
+            # NOTE: a custom AuthorizationPolicy that allows any incoming traffic to the workload is
+            # defined here (and applied below) because it is required to receive API calls from
+            # Metacontroller, whose webhook Resource Dispatcher implements, as Metacontroller does not
+            # have Juju relations with Resource Dispatcher (yet, at the time of writing) and is
+            # therefore not possible to allow traffic from one to the other via neither the AppPolicy
+            # nor the UnitPolicy by istio_beacon_k8s.v0.service_mesh
+            self._allow_all_to_workload_auth_policy = generate_allow_all_authorization_policy(
+                app_name=self._app_name,
+                namespace=self._namespace,
+            )
 
     @property
     def container(self):
@@ -350,7 +351,7 @@ class ResourceDispatcherOperator(CharmBase):
         # verifying that the defined AuthorizationPolicy is valid (i.e. supported):
         try:
             self._authorization_policy_resource_manager._validate_raw_policies(
-                [self._allow_all_to_workload_authorization_policy]
+                [self._allow_all_to_workload_auth_policy]
             )
         except (RuntimeError, TypeError) as e:
             raise GenericCharmRuntimeError(f"Error validating raw policies: {e}")
@@ -359,7 +360,7 @@ class ResourceDispatcherOperator(CharmBase):
         policies = []
         if self.ambient_mesh_enabled:
             self.logger.info("Ambient mode enabled, creating the allow-all policy...")
-            policies.append(self._allow_all_to_workload_authorization_policy)
+            policies.append(self._allow_all_to_workload_auth_policy)
         else:
             self.logger.info("Ambient mode disabled, removing the allow-all policy...")
         self._authorization_policy_resource_manager.reconcile(

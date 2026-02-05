@@ -391,18 +391,17 @@ class TestCharm:
         expected_policy_count = int(relation_exists)
         harness.set_leader(True)
         harness.begin()
-        if relation_exists:
-            rel_id = harness.add_relation(
-                SERVICE_MESH_RELATION_ENDPOINT, SERVICE_MESH_RELATION_PROVIDER
-            )
-            harness.add_relation_unit(rel_id, "istio-beacon-k8s/0")
 
         with patch.object(
             harness.charm.service_mesh.component._authorization_policy_resource_manager,
             "reconcile",
         ) as mock_reconcile:
             # act:
-            harness.charm.on.install.emit()
+            if relation_exists:
+                rel_id = harness.add_relation(
+                    SERVICE_MESH_RELATION_ENDPOINT, SERVICE_MESH_RELATION_PROVIDER
+                )
+                harness.add_relation_unit(rel_id, f"{SERVICE_MESH_RELATION_PROVIDER}/0")
 
             # assert:
             mock_reconcile.assert_called_once()
@@ -460,7 +459,7 @@ class TestCharm:
         rel_id = harness.add_relation(
             SERVICE_MESH_RELATION_ENDPOINT, SERVICE_MESH_RELATION_PROVIDER
         )
-        harness.add_relation_unit(rel_id, "istio-beacon-k8s/0")
+        harness.add_relation_unit(rel_id, f"{SERVICE_MESH_RELATION_PROVIDER}/0")
 
         with patch.object(
             harness.charm.service_mesh.component._authorization_policy_resource_manager,

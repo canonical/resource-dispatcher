@@ -113,7 +113,7 @@ def harness() -> Harness:
 def mock_lightkube_client(mocker) -> MagicMock:
     """Mock lightkube Client and _is_patched()."""
     mock_client = MagicMock()
-    mocker.patch("components.service_mesh_component.Client", return_value=mock_client)
+    mocker.patch("charm.Client", return_value=mock_client)
     return mock_client
 
 
@@ -398,11 +398,10 @@ class TestCharm:
             harness.add_relation_unit(rel_id, f"{SERVICE_MESH_RELATION_PROVIDER}/0")
 
         with patch.object(
-            harness.charm.service_mesh.component._authorization_policy_resource_manager,
-            "reconcile",
+            harness.charm._authorization_policy_resource_manager, "reconcile"
         ) as mock_reconcile:
             # act:
-            harness.charm.service_mesh.component._configure_app_leader(None)
+            harness.charm.on[SERVICE_MESH_RELATION_ENDPOINT].relation_changed.emit()
 
             # assert:
             mock_reconcile.assert_called_once()
@@ -427,7 +426,7 @@ class TestCharm:
             "reconcile",
         ) as mock_reconcile:
             # act:
-            harness.charm.service_mesh.component.remove(None)
+            harness.charm.on.remove.emit()
 
             # assert:
             mock_reconcile.assert_called_once()
@@ -469,7 +468,7 @@ class TestCharm:
             # act (and assert exception raised):
             mock_validate.side_effect = exception_type(exception_msg)
             with pytest.raises(GenericCharmRuntimeError) as exc_info:
-                harness.charm.service_mesh.component.get_status()
+                harness.charm.on[SERVICE_MESH_RELATION_ENDPOINT].relation_changed.emit()
 
             # assert (the rest)
             assert "Error validating raw policies" in str(exc_info.value)

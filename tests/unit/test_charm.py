@@ -376,6 +376,10 @@ class TestCharm:
 
 
     @patch("charm.KubernetesResourceHandler")
+    @patch(
+        "charm.KubernetesServicePatch",
+        lambda x, y, service_name, service_type, refresh_event: None,
+    )
     @pytest.mark.parametrize(
         "relation_exists,expected_policies_count",
         [
@@ -386,7 +390,7 @@ class TestCharm:
     def test_mmm(
         self,
         harness,
-        mock_kubernetes_service_patch,
+        mock_lightkube_client: MagicMock,
         relation_exists,
         expected_policies_count,
     ):
@@ -415,6 +419,10 @@ class TestCharm:
             assert len(call_args.kwargs["raw_policies"]) == expected_policies_count
 
     @patch("charm.KubernetesResourceHandler")
+    @patch(
+        "charm.KubernetesServicePatch",
+        lambda x, y, service_name, service_type, refresh_event: None,
+    )
     @pytest.mark.parametrize("relation_exists", [True, False])
     def test_service_mesh_prm_reconcile_called(
         self,

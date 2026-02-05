@@ -47,7 +47,7 @@ class ServiceMeshComponent(Component):
         )
 
         # NOTE: a custom AuthorizationPolicy that allows any incoming traffic to the workload is
-        # here defined (and applied below) because it is required to receive API calls from
+        # defined here (and applied below) because it is required to receive API calls from
         # Metacontroller, whose webhook Resource Dispatcher implements, as Metacontroller does not
         # have Juju relations with Resource Dispatcher (yet, at the time of writing) and is
         # therefore not possible to allow traffic from one to the other via neither the AppPolicy

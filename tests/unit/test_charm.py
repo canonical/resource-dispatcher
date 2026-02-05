@@ -390,7 +390,6 @@ class TestCharm:
         # arrange:
         expected_policy_count = int(relation_exists)
         harness.set_leader(True)
-        harness.begin()
         if relation_exists:
             rel_id = harness.add_relation(
                 SERVICE_MESH_RELATION_ENDPOINT, SERVICE_MESH_RELATION_PROVIDER
@@ -402,7 +401,7 @@ class TestCharm:
             "reconcile",
         ) as mock_reconcile:
             # act:
-            harness.charm.on.install.emit()
+            harness.begin_with_initial_hooks()
 
             # assert:
             mock_reconcile.assert_called_once()

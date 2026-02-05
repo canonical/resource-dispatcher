@@ -6,6 +6,7 @@
 import logging
 
 import yaml
+from charmed_kubeflow_chisme.components import CharmReconciler, LeadershipGateComponent
 from charmed_kubeflow_chisme.exceptions import ErrorWithStatus, GenericCharmRuntimeError
 from charmed_kubeflow_chisme.kubernetes import KubernetesResourceHandler
 from charmed_kubeflow_chisme.lightkube.batch import delete_many
@@ -19,6 +20,8 @@ from ops.charm import CharmBase
 from ops.framework import EventBase
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus
 from ops.pebble import APIError, ChangeError, Layer
+
+from components.service_mesh_component import ServiceMeshComponent
 
 K8S_RESOURCE_FILES = ["src/templates/decorator-controller.yaml.j2"]
 DISPATCHER_RESOURCES_PATH = "/var/lib/pebble/default/resources"  # NOTE: in Pebble user's home dir
@@ -93,6 +96,20 @@ class ResourceDispatcherOperator(CharmBase):
             self._rolebindings_manifests_provider,
         ]:
             self.framework.observe(provider.on.updated, self._on_event)
+
+        self.charm_reconciler = CharmReconciler(self)
+
+        self.leadership_gate = self.charm_reconciler.add(
+            component=LeadershipGateComponent(charm=self, name="leadership-gate"),
+            depends_on=[],
+        )
+
+        self.service_mesh = self.charm_reconciler.add(
+            component=ServiceMeshComponent(charm=self, name="ambient-mode-service-mesh"),
+            depends_on=[self.leadership_gate],
+        )
+
+        self.charm_reconciler.install_default_event_handlers()
 
     @property
     def container(self):

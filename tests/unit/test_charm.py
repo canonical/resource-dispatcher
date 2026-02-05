@@ -379,7 +379,7 @@ class TestCharm:
         "charm.KubernetesServicePatch",
         lambda x, y, service_name, service_type, refresh_event: None,
     )
-    @patch("charm.ResourceDispatcherOperator._deploy_k8s_resources")
+    @patch("charm.ResourceDispatcherOperator")
     @pytest.mark.parametrize("relation_exists", [True, False])
     def test_service_mesh_prm_reconcile_called(
         self,

@@ -403,12 +403,12 @@ class TestCharm:
             harness.charm._authorization_policy_resource_manager, "reconcile"
         ) as mock_reconcile:
             # act:
+            harness.charm.on.install.emit()
             if relation_exists:
                 relation = harness.charm.framework.model.get_relation(
                     SERVICE_MESH_RELATION_ENDPOINT, rel_id
                 )
                 harness.charm.on[SERVICE_MESH_RELATION_ENDPOINT].relation_changed.emit(relation)
-            harness.charm.on.install.emit()
 
             # assert:
             mock_reconcile.assert_called_once()

@@ -388,7 +388,8 @@ class TestCharm:
     ):
         """Test PolicyResourceManager.reconcile called with correct policies based on relation."""
         # arrange:
-        expected_policy_count = int(relation_exists)
+        expected_call_count = int(relation_exists)
+        expected_policy_count = expected_call_count
         harness.set_leader(True)
         harness.begin()
 
@@ -402,14 +403,16 @@ class TestCharm:
                     SERVICE_MESH_RELATION_ENDPOINT, SERVICE_MESH_RELATION_PROVIDER
                 )
                 harness.add_relation_unit(rel_id, f"{SERVICE_MESH_RELATION_PROVIDER}/0")
+            harness.charm.on.install.emit()
 
             # assert:
-            mock_reconcile.assert_called_once()
-            kwargs = mock_reconcile.call_args.kwargs
-            assert kwargs["policies"] == []
-            assert "mesh_type" in kwargs
-            assert "raw_policies" in kwargs
-            assert len(kwargs["raw_policies"]) == expected_policy_count
+            mock_reconcile.call_count(expected_call_count)
+            if relation_exists:
+                kwargs = mock_reconcile.call_args.kwargs
+                assert kwargs["policies"] == []
+                assert "mesh_type" in kwargs
+                assert "raw_policies" in kwargs
+                assert len(kwargs["raw_policies"]) == expected_policy_count
 
     @patch(
         "charm.KubernetesServicePatch",

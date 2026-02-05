@@ -71,6 +71,7 @@ class ServiceMeshComponent(Component):
 
     def _configure_app_leader(self, event):
         """Ensure the allow-all AuthorizationPolicies is in place (only) when in ambient mode."""
+        raise
         policies = []
 
         if self.ambient_mesh_enabled:

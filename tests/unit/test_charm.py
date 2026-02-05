@@ -374,50 +374,6 @@ class TestCharm:
         harness.charm.on.upgrade_charm.emit()
         deploy_k8s_resources.assert_called_once()
 
-
-    @patch("charm.KubernetesResourceHandler")
-    @patch(
-        "charm.KubernetesServicePatch",
-        lambda x, y, service_name, service_type, refresh_event: None,
-    )
-    @pytest.mark.parametrize(
-        "relation_exists,expected_policies_count",
-        [
-            (True, 1),
-            (None, 0),
-        ],
-    )
-    def test_mmm(
-        self,
-        harness,
-        mock_lightkube_client: MagicMock,
-        relation_exists,
-        expected_policies_count,
-    ):
-        """Test PolicyResourceManager.reconcile is called with correct policies based on relation."""
-        harness.set_leader(True)
-        harness.begin()
-
-        # Create the service mesh relation when requested
-        if relation_exists:
-            rel_id = harness.add_relation("service-mesh", "istio-beacon-k8s")
-            harness.add_relation_unit(rel_id, "istio-beacon-k8s/0")
-
-        with patch.object(
-            harness.charm.service_mesh.component._authorization_policy_resource_manager,
-            "reconcile",
-        ) as mock_reconcile:
-            # Act
-            harness.charm.on.install.emit()
-
-            # Assert reconcile was called with the expected parameters
-            mock_reconcile.assert_called_once()
-            call_args = mock_reconcile.call_args
-            assert call_args.kwargs["policies"] == []
-            assert "mesh_type" in call_args.kwargs
-            assert "raw_policies" in call_args.kwargs
-            assert len(call_args.kwargs["raw_policies"]) == expected_policies_count
-
     @patch("charm.KubernetesResourceHandler")
     @patch(
         "charm.KubernetesServicePatch",

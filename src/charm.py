@@ -130,10 +130,10 @@ class ResourceDispatcherOperator(CharmBase):
 
             # NOTE: a custom AuthorizationPolicy that allows any incoming traffic to the workload is
             # defined here (and applied below) because it is required to receive API calls from
-            # Metacontroller, whose webhook Resource Dispatcher implements, as Metacontroller does not
-            # have Juju relations with Resource Dispatcher (yet, at the time of writing) and is
-            # therefore not possible to allow traffic from one to the other via neither the AppPolicy
-            # nor the UnitPolicy by istio_beacon_k8s.v0.service_mesh
+            # Metacontroller, whose webhook Resource Dispatcher implements, as Metacontroller does
+            # not have Juju relations with Resource Dispatcher (yet, at the time of writing) and is
+            # therefore not possible to allow traffic from one to the other via neither the
+            # AppPolicy nor the UnitPolicy by istio_beacon_k8s.v0.service_mesh
             self._allow_all_to_workload_auth_policy = generate_allow_all_authorization_policy(
                 app_name=self._app_name,
                 namespace=self._namespace,

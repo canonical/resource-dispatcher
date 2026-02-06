@@ -124,10 +124,8 @@ class ResourceDispatcherOperator(CharmBase):
         # to update AuthorizationPolicies when the ambient-mode relation with the service mesh
         # provider is updated:
         for event in (
-            self.on.service_mesh_relation_created,
-            self.on.service_mesh_relation_joined,
-            self.on.service_mesh_relation_changed,
-            self.on.service_mesh_relation_broken,
+            self.on[self._service_mesh_relation_name].relation_changed,
+            self.on[self._service_mesh_relation_name].relation_broken,
         ):
             self.framework.observe(event, self._on_service_mesh_relation_events)
 

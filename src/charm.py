@@ -31,6 +31,7 @@ DISPATCHER_RESOURCES_PATH = "/var/lib/pebble/default/resources"  # NOTE: in Pebb
 PODDEFAULTS_RELATION_NAME = "pod-defaults"
 SECRETS_RELATION_NAME = "secrets"
 SERVICEACCOUNTS_RELATION_NAME = "service-accounts"
+SERVICE_MESH_RELATION_NAME = "service-mesh"
 ROLES_RELATION_NAME = "roles"
 ROLEBINDINGS_RELATION_NAME = "role-bindings"
 
@@ -44,7 +45,6 @@ class ResourceDispatcherOperator(CharmBase):
         self.logger = logging.getLogger(__name__)
 
         self._app_name = self.app.name
-        self._service_mesh_relation_name = "service-mesh"
         self._namespace = self.model.name
         self._lightkube_field_manager = "lightkube"
         self._name = self.model.app.name
@@ -124,8 +124,8 @@ class ResourceDispatcherOperator(CharmBase):
         # to update AuthorizationPolicies when the ambient-mode relation with the service mesh
         # provider is updated:
         for event in (
-            self.on[self._service_mesh_relation_name].relation_changed,
-            self.on[self._service_mesh_relation_name].relation_broken,
+            self.on[SERVICE_MESH_RELATION_NAME].relation_changed,
+            self.on[SERVICE_MESH_RELATION_NAME].relation_broken,
         ):
             self.framework.observe(event, self._on_service_mesh_relation_events)
 

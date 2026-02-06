@@ -118,6 +118,7 @@ def mock_lightkube_client(mocker) -> MagicMock:
     """Mock lightkube Client and _is_patched()."""
     mock_client = MagicMock()
     mocker.patch("charm.Client", return_value=mock_client)
+    mocker.patch("charms.istio_beacon_k8s.v0.service_mesh.Client", return_value=mock_client)
     return mock_client
 
 
@@ -382,13 +383,11 @@ class TestCharm:
         lambda x, y, service_name, service_type, refresh_event: None,
     )
     @patch("charm.ServiceMeshConsumer")
-    @patch("charms.istio_beacon_k8s.v0.service_mesh.Client")
     @pytest.mark.parametrize("relation_exists", [True, False])
     def test_auth_policy_reconcile_called_on_relation(
         self,
         _: MagicMock,
         __: MagicMock,
-        ___: MagicMock,
         harness,
         mock_lightkube_client: MagicMock,
         relation_exists,
@@ -466,7 +465,6 @@ class TestCharm:
         lambda x, y, service_name, service_type, refresh_event: None,
     )
     @patch("charm.ServiceMeshConsumer")
-    @patch("charms.istio_beacon_k8s.v0.service_mesh.Client")
     @pytest.mark.parametrize(
         "exception_type,exception_msg",
         [
@@ -478,7 +476,6 @@ class TestCharm:
         self,
         _: MagicMock,
         __: MagicMock,
-        ___: MagicMock,
         harness,
         mock_lightkube_client: MagicMock,
         exception_type,

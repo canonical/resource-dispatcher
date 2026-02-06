@@ -381,10 +381,14 @@ class TestCharm:
         "charm.KubernetesServicePatch",
         lambda x, y, service_name, service_type, refresh_event: None,
     )
+    @patch("charm.ServiceMeshConsumer")
+    @patch("charms.istio_beacon_k8s.v0.service_mesh.Client")
     @pytest.mark.parametrize("relation_exists", [True, False])
     def test_auth_policy_reconcile_called_on_relation(
         self,
         _: MagicMock,
+        __: MagicMock,
+        ___: MagicMock,
         harness,
         mock_lightkube_client: MagicMock,
         relation_exists,
@@ -398,10 +402,10 @@ class TestCharm:
                 SERVICE_MESH_RELATION_ENDPOINT, SERVICE_MESH_RELATION_PROVIDER
             )
             harness.add_relation_unit(rel_id, f"{SERVICE_MESH_RELATION_PROVIDER}/0")
-            # relation = harness.charm.framework.model.get_relation(
-            #     SERVICE_MESH_RELATION_ENDPOINT, rel_id
-            # )
-            # harness.charm.on.service_mesh_relation_changed.emit(relation)
+            relation = harness.charm.framework.model.get_relation(
+                SERVICE_MESH_RELATION_ENDPOINT, rel_id
+            )
+            harness.charm.on.service_mesh_relation_changed.emit(relation)
 
         with patch.object(
             harness.charm._authorization_policy_resource_manager, "reconcile"
@@ -452,6 +456,8 @@ class TestCharm:
         "charm.KubernetesServicePatch",
         lambda x, y, service_name, service_type, refresh_event: None,
     )
+    @patch("charm.ServiceMeshConsumer")
+    @patch("charms.istio_beacon_k8s.v0.service_mesh.Client")
     @pytest.mark.parametrize(
         "exception_type,exception_msg",
         [
@@ -462,6 +468,8 @@ class TestCharm:
     def test_auth_policy_validation_error_handling(
         self,
         _: MagicMock,
+        __: MagicMock,
+        ___: MagicMock,
         harness,
         mock_lightkube_client: MagicMock,
         exception_type,

@@ -384,6 +384,7 @@ class TestCharm:
     @pytest.mark.parametrize("relation_exists", [True, False])
     def test_service_mesh_prm_reconcile_called(
         self,
+        _: MagicMock,
         harness,
         mock_lightkube_client: MagicMock,
         relation_exists,
@@ -460,6 +461,7 @@ class TestCharm:
     )
     def test_service_mesh_validation_error_handling(
         self,
+        _: MagicMock,
         harness,
         mock_lightkube_client: MagicMock,
         exception_type,

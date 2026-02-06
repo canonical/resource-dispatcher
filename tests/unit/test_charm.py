@@ -393,7 +393,7 @@ class TestCharm:
         mock_lightkube_client: MagicMock,
         relation_exists,
     ):
-        """Test PolicyResourceManager.reconcile called with correct policies based on relation."""
+        """Test PolicyResourceManager.reconcile called correctly based on relation."""
         # arrange:
         expected_policy_count = int(relation_exists)
         harness.begin()
@@ -414,12 +414,15 @@ class TestCharm:
             harness.charm.on.install.emit()
 
             # assert:
-            mock_reconcile.assert_called_once()
-            kwargs = mock_reconcile.call_args.kwargs
-            assert kwargs["policies"] == []
-            assert "mesh_type" in kwargs
-            assert "raw_policies" in kwargs
-            assert len(kwargs["raw_policies"]) == expected_policy_count
+            if relation_exists:
+                mock_reconcile.assert_called_once()
+                kwargs = mock_reconcile.call_args.kwargs
+                assert kwargs["policies"] == []
+                assert "mesh_type" in kwargs
+                assert "raw_policies" in kwargs
+                assert len(kwargs["raw_policies"]) == expected_policy_count
+            else:
+                mock_reconcile.assert_not_called()
 
     @patch("charm.KubernetesResourceHandler")
     @patch(

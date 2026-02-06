@@ -406,7 +406,7 @@ class TestCharm:
             harness.charm._authorization_policy_resource_manager, "reconcile"
         ) as mock_reconcile:
             # act:
-            harness.charm._on_service_mesh_relation_events(None)
+            harness.charm.on.install.emit()
 
             # assert:
             mock_reconcile.assert_called_once()
@@ -431,7 +431,8 @@ class TestCharm:
             "reconcile",
         ) as mock_reconcile:
             # act:
-            harness.charm._on_remove(None)
+            harness.charm.on.install.emit()
+            harness.charm.on.remove.emit()
 
             # assert:
             mock_reconcile.assert_called_once()
@@ -471,9 +472,14 @@ class TestCharm:
             "_validate_raw_policies",
         ) as mock_validate:
             # act (and assert exception raised):
+            harness.charm.on.install.emit()
             mock_validate.side_effect = exception_type(exception_msg)
             with pytest.raises(GenericCharmRuntimeError) as exc_info:
-                harness.charm._on_service_mesh_relation_events(None)
+                relation = harness.charm.framework.model.get_relation(
+                    SERVICE_MESH_RELATION_ENDPOINT, rel_id
+                )
+                harness.charm.on[SERVICE_MESH_RELATION_ENDPOINT].relation_changed.emit(relation)
+            harness.charm.on.install.emit()
 
             # assert (the rest)
             assert "Error validating raw policies" in str(exc_info.value)

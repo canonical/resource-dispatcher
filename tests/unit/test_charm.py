@@ -394,6 +394,7 @@ class TestCharm:
     ):
         """Test PolicyResourceManager.reconcile called correctly based on relation."""
         # arrange:
+
         expected_policy_count = int(relation_exists)
         harness.begin()
         if relation_exists:
@@ -401,18 +402,16 @@ class TestCharm:
                 SERVICE_MESH_RELATION_ENDPOINT, SERVICE_MESH_RELATION_PROVIDER
             )
             harness.add_relation_unit(rel_id, f"{SERVICE_MESH_RELATION_PROVIDER}/0")
-
         with (
             patch.object(
-                harness.charm._authorization_policy_resource_manager,
-                "reconcile"
+                harness.charm._authorization_policy_resource_manager, "reconcile"
             ) as mocked_reconcile,
             patch.object(
-                harness.charm._authorization_policy_resource_manager,
-                "_validate_raw_policies"
+                harness.charm._authorization_policy_resource_manager, "_validate_raw_policies"
             ),
         ):
             # act:
+
             if relation_exists:
                 relation = harness.charm.framework.model.get_relation(
                     SERVICE_MESH_RELATION_ENDPOINT, rel_id
@@ -420,6 +419,7 @@ class TestCharm:
                 harness.charm.on.service_mesh_relation_changed.emit(relation)
 
             # assert:
+
             if relation_exists:
                 mocked_reconcile.assert_called_once()
                 kwargs = mocked_reconcile.call_args.kwargs
@@ -445,16 +445,18 @@ class TestCharm:
     ):
         """Test that PolicyResourceManager.reconcile is called with empty policies on remove."""
         # arrange:
-        harness.begin()
 
+        harness.begin()
         with patch.object(
             harness.charm._authorization_policy_resource_manager,
             "reconcile",
         ) as mocked_reconcile:
             # act:
+
             harness.charm.on.remove.emit()
 
             # assert:
+
             mocked_reconcile.assert_called_once()
             kwargs = mocked_reconcile.call_args.kwargs
             assert kwargs["policies"] == []
@@ -484,17 +486,18 @@ class TestCharm:
     ):
         """Test AuthorizationPolicy raises exceptions on validation errors."""
         # arrange:
+
         harness.begin()
         rel_id = harness.add_relation(
             SERVICE_MESH_RELATION_ENDPOINT, SERVICE_MESH_RELATION_PROVIDER
         )
         harness.add_relation_unit(rel_id, f"{SERVICE_MESH_RELATION_PROVIDER}/0")
-
         with patch.object(
             harness.charm._authorization_policy_resource_manager,
             "_validate_raw_policies",
         ) as mocked_validate_raw_policies:
             # act (and assert exception raised):
+
             mocked_validate_raw_policies.side_effect = exception_type(exception_msg)
             with pytest.raises(GenericCharmRuntimeError) as exc_info:
                 relation = harness.charm.framework.model.get_relation(
@@ -502,5 +505,6 @@ class TestCharm:
                 )
                 harness.charm.on[SERVICE_MESH_RELATION_ENDPOINT].relation_changed.emit(relation)
 
-            # assert (the rest)
+            # assert (the rest):
+
             assert "Error validating raw policies" in str(exc_info.value)

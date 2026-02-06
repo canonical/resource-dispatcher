@@ -407,22 +407,28 @@ class TestCharm:
             )
             harness.charm.on.service_mesh_relation_changed.emit(relation)
 
-        with patch.object(
-            harness.charm._authorization_policy_resource_manager, "reconcile"
-        ) as mock_reconcile:
+        with (
+            patch.object(
+                harness.charm._authorization_policy_resource_manager, "reconcile"
+            ) as mocked_reconcile,
+            patch.object(
+                harness.charm._authorization_policy_resource_manager,
+            "_validate_raw_policies"
+            ) as mocked_validate_raw_policies,
+        ):
             # act:
             harness.charm.on.install.emit()
 
             # assert:
             if relation_exists:
-                mock_reconcile.assert_called_once()
-                kwargs = mock_reconcile.call_args.kwargs
+                mocked_reconcile.assert_called_once()
+                kwargs = mocked_reconcile.call_args.kwargs
                 assert kwargs["policies"] == []
                 assert "mesh_type" in kwargs
                 assert "raw_policies" in kwargs
                 assert len(kwargs["raw_policies"]) == expected_policy_count
             else:
-                mock_reconcile.assert_not_called()
+                mocked_reconcile.assert_not_called()
 
     @patch("charm.KubernetesResourceHandler")
     @patch(
@@ -444,13 +450,13 @@ class TestCharm:
         with patch.object(
             harness.charm._authorization_policy_resource_manager,
             "reconcile",
-        ) as mock_reconcile:
+        ) as mocked_reconcile:
             # act:
             harness.charm.on.remove.emit()
 
             # assert:
-            mock_reconcile.assert_called_once()
-            kwargs = mock_reconcile.call_args.kwargs
+            mocked_reconcile.assert_called_once()
+            kwargs = mocked_reconcile.call_args.kwargs
             assert kwargs["policies"] == []
             assert kwargs["raw_policies"] == []
 
@@ -489,16 +495,15 @@ class TestCharm:
         with patch.object(
             harness.charm._authorization_policy_resource_manager,
             "_validate_raw_policies",
-        ) as mock_validate:
+        ) as mocked_validate_raw_policies:
             # act (and assert exception raised):
             harness.charm.on.install.emit()
-            mock_validate.side_effect = exception_type(exception_msg)
+            mocked_validate_raw_policies.side_effect = exception_type(exception_msg)
             with pytest.raises(GenericCharmRuntimeError) as exc_info:
                 relation = harness.charm.framework.model.get_relation(
                     SERVICE_MESH_RELATION_ENDPOINT, rel_id
                 )
                 harness.charm.on[SERVICE_MESH_RELATION_ENDPOINT].relation_changed.emit(relation)
-            harness.charm.on.install.emit()
 
             # assert (the rest)
             assert "Error validating raw policies" in str(exc_info.value)

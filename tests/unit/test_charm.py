@@ -382,7 +382,7 @@ class TestCharm:
         lambda x, y, service_name, service_type, refresh_event: None,
     )
     @pytest.mark.parametrize("relation_exists", [True, False])
-    def test_service_mesh_prm_reconcile_called(
+    def test_auth_policy_reconcile_called_on_relation(
         self,
         _: MagicMock,
         harness,
@@ -423,7 +423,7 @@ class TestCharm:
         lambda x, y, service_name, service_type, refresh_event: None,
     )
     @patch("charm.delete_many")
-    def test_service_mesh_prm_remove_called(
+    def test_auth_policy_reconcile_called_on_remove(
         self,
         delete_many: MagicMock,
         _: MagicMock,
@@ -459,7 +459,7 @@ class TestCharm:
             (TypeError, "TypeError due to invalid type!"),
         ],
     )
-    def test_service_mesh_validation_error_handling(
+    def test_auth_policy_validation_error_handling(
         self,
         _: MagicMock,
         harness,

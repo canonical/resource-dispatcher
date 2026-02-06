@@ -7,11 +7,15 @@ output "provides" {
     secrets          = "secrets",
     service_accounts = "service-accounts",
     pod_defaults     = "pod-defaults",
+    provide_cmr_mesh  = "provide-cmr-mesh",
     roles            = "roles",
     role_bindings    = "role-bindings",
   }
 }
 
 output "requires" {
-  value = {}
+  value = {
+    service_mesh     = "service-mesh",
+    require_cmr_mesh = "require-cmr-mesh",
+  }
 }

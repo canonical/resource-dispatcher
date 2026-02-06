@@ -343,7 +343,7 @@ class ResourceDispatcherOperator(CharmBase):
     @property
     def ambient_mesh_enabled(self) -> bool:
         """Whether the relation with the ambient-mode service-mesh provider is setup."""
-        if self.model.get_relation(self._service_mesh_relation_name):
+        if self.model.get_relation(SERVICE_MESH_RELATION_NAME):
             return True
         return False
 

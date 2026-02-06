@@ -421,7 +421,14 @@ class TestCharm:
         "charm.KubernetesServicePatch",
         lambda x, y, service_name, service_type, refresh_event: None,
     )
-    def test_service_mesh_prm_remove_called(self, harness, mock_lightkube_client: MagicMock):
+    @patch("charm.delete_many")
+    def test_service_mesh_prm_remove_called(
+        self,
+        delete_many: MagicMock,
+        _: MagicMock,
+        harness,
+        mock_lightkube_client: MagicMock,
+    ):
         """Test that PolicyResourceManager.reconcile is called with empty policies on remove."""
         # arrange:
         harness.begin()
@@ -431,7 +438,6 @@ class TestCharm:
             "reconcile",
         ) as mock_reconcile:
             # act:
-            harness.charm.on.install.emit()
             harness.charm.on.remove.emit()
 
             # assert:

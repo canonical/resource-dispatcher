@@ -20,7 +20,7 @@ from charms.resource_dispatcher.v0.kubernetes_manifests import KubernetesManifes
 from lightkube import ApiError, Client
 from lightkube.generic_resource import load_in_cluster_generic_resources
 from lightkube.models.core_v1 import ServicePort
-from ops import UpgradeCharmEvent, main
+from ops import RelationEvent, UpgradeCharmEvent, main
 from ops.charm import CharmBase
 from ops.framework import EventBase
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus
@@ -347,7 +347,7 @@ class ResourceDispatcherOperator(CharmBase):
             return True
         return False
 
-    def _on_service_mesh_relation_events(self, event: EventBase) -> None:
+    def _on_service_mesh_relation_events(self, event: RelationEvent) -> None:
         """Update AuthorizationPolicies according to service-mesh relation changes."""
         self._check_leader()
 

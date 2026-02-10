@@ -105,8 +105,6 @@ class ResourceDispatcherOperator(CharmBase):
 
         # for an ambient-mode service mesh:
 
-        self._check_leader()
-
         self._mesh = ServiceMeshConsumer(
             self, policies=None  # custom AuthorizationPolicies managed below
         )

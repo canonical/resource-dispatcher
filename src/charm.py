@@ -40,7 +40,7 @@ class ResourceDispatcherOperator(CharmBase):
         self._lightkube_field_manager = "lightkube"
         self._name = self.model.app.name
         self._service_port = 80
-        self._webhook_port = 8080
+        self._webserver_port = 8080
         self._namespace_label = self.model.config["target_namespace_label"]
         self._container_name = "resource-dispatcher"
         self._container = self.unit.get_container(self._container_name)
@@ -60,7 +60,7 @@ class ResourceDispatcherOperator(CharmBase):
         self.framework.observe(self.on.remove, self._on_remove)
 
         port = ServicePort(
-            port=self._service_port, targetPort=self._webhook_port, name=f"{self.app.name}"
+            port=self._service_port, targetPort=self._webserver_port, name=f"{self.app.name}"
         )
         self.service_patcher = KubernetesServicePatch(
             self,
@@ -127,7 +127,7 @@ class ResourceDispatcherOperator(CharmBase):
                     "command": (
                         "python3 "
                         "main.py "
-                        f"--port {self._webhook_port} "
+                        f"--port {self._webserver_port} "
                         f"--label {self._namespace_label} "
                         f"--folder {DISPATCHER_RESOURCES_PATH}"
                     ),

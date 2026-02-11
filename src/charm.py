@@ -60,9 +60,7 @@ class ResourceDispatcherOperator(CharmBase):
         self.framework.observe(self.on.remove, self._on_remove)
 
         port = ServicePort(
-            port=self._service_port,
-            targetPort=self._webhook_port,
-            name=f"{self.app.name}"
+            port=self._service_port, targetPort=self._webhook_port, name=f"{self.app.name}"
         )
         self.service_patcher = KubernetesServicePatch(
             self,

@@ -21,7 +21,7 @@ from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingSta
 from ops.pebble import APIError, ChangeError, Layer
 
 K8S_RESOURCE_FILES = ["src/templates/decorator-controller.yaml.j2"]
-DISPATCHER_RESOURCES_PATH = "/app/resources"
+DISPATCHER_RESOURCES_PATH = "/tmp/resources"
 PODDEFAULTS_RELATION_NAME = "pod-defaults"
 SECRETS_RELATION_NAME = "secrets"
 SERVICEACCOUNTS_RELATION_NAME = "service-accounts"

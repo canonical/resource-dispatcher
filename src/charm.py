@@ -48,7 +48,7 @@ class ResourceDispatcherOperator(CharmBase):
         self._context = {
             "app_name": self._name,
             "namespace": self._namespace,
-            "webhook_port": self._webhook_port,
+            "service_port": self._service_port,
             "label": self._namespace_label,
         }
 

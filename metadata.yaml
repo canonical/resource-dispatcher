@@ -17,7 +17,7 @@ resources:
   oci-image:
     type: oci-image
     description: Backing OCI image
-    upstream-source: docker.io/mattiaatcanonical/resource-dispatcher:rock-3.1-unprivileged
+    upstream-source: docker.io/mattiaatcanonical/resource-dispatcher:rock-3.1-unprivileged-2-pm
 provides:
   secrets:
     interface: kubernetes_manifest

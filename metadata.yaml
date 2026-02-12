@@ -17,7 +17,7 @@ resources:
   oci-image:
     type: oci-image
     description: Backing OCI image
-    upstream-source: docker.io/charmedkubeflow/resource-dispatcher:3.1-19fc3ab
+    upstream-source: docker.io/mattiaatcanonical/resource-dispatcher:unprivileged
 provides:
   secrets:
     interface: kubernetes_manifest

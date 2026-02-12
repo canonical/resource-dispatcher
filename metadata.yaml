@@ -11,6 +11,8 @@ charm-user: non-root
 containers:
   resource-dispatcher:
     resource: oci-image
+    uid: 584792
+    gid: 584792
 resources:
   oci-image:
     type: oci-image

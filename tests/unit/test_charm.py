@@ -57,6 +57,9 @@ SERVICEACCOUNT = {
     "secrets": [{"name": "s3creds"}],
 }
 
+SERVICE_MESH_RELATION_ENDPOINT = "service-mesh"
+SERVICE_MESH_RELATION_PROVIDER = "istio-beacon-k8s"
+
 VALID_MANIFESTS = [{"metadata": {"name": "a"}}, {"metadata": {"name": "b"}}]
 INVALID_MANIFESTS = VALID_MANIFESTS + [{"metadata": {"name": "a"}}]
 
@@ -100,10 +103,23 @@ def harness() -> Harness:
 
     harness = Harness(ResourceDispatcherOperator)
 
+    harness.set_leader(True)
+
     # setup container networking simulation
     harness.set_can_connect("resource-dispatcher", True)
 
-    return harness
+    yield harness
+
+    harness.cleanup()
+
+
+@pytest.fixture(autouse=True)
+def mock_lightkube_client(mocker) -> MagicMock:
+    """Mock lightkube Client and _is_patched()."""
+    mock_client = MagicMock()
+    mocker.patch("charm.Client", return_value=mock_client)
+    mocker.patch("charms.istio_beacon_k8s.v0.service_mesh.Client", return_value=mock_client)
+    return mock_client
 
 
 def add_secret_relation_to_harness(harness: Harness) -> Harness:
@@ -129,8 +145,14 @@ class TestCharm:
         lambda x, y, service_name, service_type, refresh_event: None,
     )
     @patch("charm.ResourceDispatcherOperator.k8s_resource_handler")
-    def test_check_leader_failure(self, _: MagicMock, harness: Harness):
+    def test_check_leader_failure(
+        self,
+        _: MagicMock,
+        harness: Harness,
+        mock_lightkube_client: MagicMock,
+    ):
         harness.begin()
+        harness.set_leader(False)
         with pytest.raises(ErrorWithStatus) as e_info:
             harness.charm._check_leader()
         assert "Waiting for leadership" in str(e_info)
@@ -141,8 +163,12 @@ class TestCharm:
         lambda x, y, service_name, service_type, refresh_event: None,
     )
     @patch("charm.ResourceDispatcherOperator.k8s_resource_handler")
-    def test_check_leader_success(self, _: MagicMock, harness: Harness):
-        harness.set_leader(True)
+    def test_check_leader_success(
+        self,
+        _: MagicMock,
+        harness: Harness,
+        mock_lightkube_client: MagicMock,
+    ):
         harness.begin()
         try:
             harness.charm._check_leader()
@@ -154,7 +180,12 @@ class TestCharm:
         lambda x, y, service_name, service_type, refresh_event: None,
     )
     @patch("charm.ResourceDispatcherOperator._deploy_k8s_resources")
-    def test_on_install_success(self, deploy_k8s_resources: MagicMock, harness: Harness):
+    def test_on_install_success(
+        self,
+        deploy_k8s_resources: MagicMock,
+        harness: Harness,
+        mock_lightkube_client: MagicMock,
+    ):
         harness.begin()
         harness.charm._on_install(None)
         deploy_k8s_resources.assert_called()
@@ -168,6 +199,7 @@ class TestCharm:
         self,
         container: MagicMock,
         harness: Harness,
+        mock_lightkube_client: MagicMock,
     ):
         change = MagicMock()
         change.tasks = []
@@ -185,6 +217,7 @@ class TestCharm:
     def test_update_layer_success(
         self,
         harness: Harness,
+        mock_lightkube_client: MagicMock,
     ):
         harness.begin()
         harness.charm._update_layer()
@@ -195,7 +228,12 @@ class TestCharm:
         lambda x, y, service_name, service_type, refresh_event: None,
     )
     @patch("charm.ResourceDispatcherOperator.k8s_resource_handler")
-    def test_deploy_k8s_resources_failure(self, k8s_handler: MagicMock, harness: Harness):
+    def test_deploy_k8s_resources_failure(
+        self,
+        k8s_handler: MagicMock,
+        harness: Harness,
+        mock_lightkube_client: MagicMock,
+    ):
         k8s_handler.apply.side_effect = _FakeApiError()
         harness.begin()
         with pytest.raises(GenericCharmRuntimeError) as exc_info:
@@ -208,7 +246,12 @@ class TestCharm:
         lambda x, y, service_name, service_type, refresh_event: None,
     )
     @patch("charm.ResourceDispatcherOperator.k8s_resource_handler")
-    def test_deploy_k8s_resources_success(self, k8s_handler: MagicMock, harness: Harness):
+    def test_deploy_k8s_resources_success(
+        self,
+        k8s_handler: MagicMock,
+        harness: Harness,
+        mock_lightkube_client: MagicMock,
+    ):
         harness.begin()
         harness.charm._deploy_k8s_resources()
         k8s_handler.apply.assert_called()
@@ -222,7 +265,13 @@ class TestCharm:
     )
     @patch("charm.ResourceDispatcherOperator.k8s_resource_handler")
     @patch("charm.delete_many")
-    def test_on_remove_failure(self, delete_many: MagicMock, _: MagicMock, harness: Harness):
+    def test_on_remove_failure(
+        self,
+        delete_many: MagicMock,
+        _: MagicMock,
+        harness: Harness,
+        mock_lightkube_client: MagicMock,
+    ):
         delete_many.side_effect = _FakeApiError()
         harness.begin()
         with pytest.raises(ApiError):
@@ -234,7 +283,13 @@ class TestCharm:
     )
     @patch("charm.ResourceDispatcherOperator.k8s_resource_handler")
     @patch("charm.delete_many")
-    def test_on_remove_success(self, delete_many: MagicMock, _: MagicMock, harness: Harness):
+    def test_on_remove_success(
+        self,
+        delete_many: MagicMock,
+        _: MagicMock,
+        harness: Harness,
+        mock_lightkube_client: MagicMock,
+    ):
         harness.begin()
         harness.charm._on_remove(None)
         assert harness.charm.model.unit.status == MaintenanceStatus("K8S resources removed")
@@ -243,9 +298,8 @@ class TestCharm:
         "charm.KubernetesServicePatch",
         lambda x, y, service_name, service_type, refresh_event: None,
     )
-    def test_get_manifests_success(self, harness: Harness):
+    def test_get_manifests_success(self, harness: Harness, mock_lightkube_client: MagicMock):
         harness = add_secret_relation_to_harness(harness)
-        harness.set_leader(True)
         harness.begin()
         secrets = harness.charm._secrets_manifests_provider.get_manifests()
         assert secrets == [SECRET1, SECRET2]
@@ -254,7 +308,7 @@ class TestCharm:
         "charm.KubernetesServicePatch",
         lambda x, y, service_name, service_type, refresh_event: None,
     )
-    def test_manifests_valid_true(self, harness: Harness):
+    def test_manifests_valid_true(self, harness: Harness, mock_lightkube_client: MagicMock):
         harness.begin()
         response = harness.charm._manifests_valid(VALID_MANIFESTS)
         assert response == True
@@ -263,7 +317,7 @@ class TestCharm:
         "charm.KubernetesServicePatch",
         lambda x, y, service_name, service_type, refresh_event: None,
     )
-    def test_manifests_valid_false(self, harness: Harness):
+    def test_manifests_valid_false(self, harness: Harness, mock_lightkube_client: MagicMock):
         harness.begin()
         response = harness.charm._manifests_valid(INVALID_MANIFESTS)
         assert response == False
@@ -275,7 +329,11 @@ class TestCharm:
     @patch("charm.ResourceDispatcherOperator.secrets_manifests_provider")
     @patch("charm.ResourceDispatcherOperator._sync_manifests")
     def test_update_manifests_success(
-        self, sync_manifests: MagicMock, secrets_manifests_provider: MagicMock, harness: Harness
+        self,
+        sync_manifests: MagicMock,
+        secrets_manifests_provider: MagicMock,
+        harness: Harness,
+        mock_lightkube_client: MagicMock,
     ):
         harness.begin()
         secrets_manifests_provider.get_manifests.return_value = ""
@@ -295,6 +353,7 @@ class TestCharm:
         _: MagicMock,
         secrets_manifests_provider: MagicMock,
         harness: Harness,
+        mock_lightkube_client: MagicMock,
     ):
         manifests_valid.return_value = False
         secrets_manifests_provider.get_manifests.return_value = ""
@@ -310,8 +369,143 @@ class TestCharm:
     )
     @patch("charm.ResourceDispatcherOperator._deploy_k8s_resources")
     def test_charm_upgrade_calls_deploy_k8s_resources(
-        self, deploy_k8s_resources: MagicMock, harness: Harness
+        self,
+        deploy_k8s_resources: MagicMock,
+        harness: Harness,
+        mock_lightkube_client: MagicMock,
     ):
         harness.begin()
         harness.charm.on.upgrade_charm.emit()
         deploy_k8s_resources.assert_called_once()
+
+    @patch("charm.KubernetesResourceHandler")
+    @patch(
+        "charm.KubernetesServicePatch",
+        lambda x, y, service_name, service_type, refresh_event: None,
+    )
+    @patch("charm.ServiceMeshConsumer")
+    @pytest.mark.parametrize("relation_exists", [True, False])
+    def test_auth_policy_reconcile_called_on_relation(
+        self,
+        _: MagicMock,
+        __: MagicMock,
+        harness,
+        mock_lightkube_client: MagicMock,
+        relation_exists,
+    ):
+        """Test PolicyResourceManager.reconcile called correctly based on relation."""
+        # arrange:
+
+        expected_policy_count = int(relation_exists)
+        harness.begin()
+        if relation_exists:
+            rel_id = harness.add_relation(
+                SERVICE_MESH_RELATION_ENDPOINT, SERVICE_MESH_RELATION_PROVIDER
+            )
+            harness.add_relation_unit(rel_id, f"{SERVICE_MESH_RELATION_PROVIDER}/0")
+        with (
+            patch.object(
+                harness.charm._authorization_policy_resource_manager, "reconcile"
+            ) as mocked_reconcile,
+            patch.object(
+                harness.charm._authorization_policy_resource_manager, "_validate_raw_policies"
+            ),
+        ):
+            # act:
+
+            if relation_exists:
+                relation = harness.charm.framework.model.get_relation(
+                    SERVICE_MESH_RELATION_ENDPOINT, rel_id
+                )
+                harness.charm.on.service_mesh_relation_changed.emit(relation)
+
+            # assert:
+
+            if relation_exists:
+                mocked_reconcile.assert_called_once()
+                kwargs = mocked_reconcile.call_args.kwargs
+                assert kwargs["policies"] == []
+                assert "mesh_type" in kwargs
+                assert "raw_policies" in kwargs
+                assert len(kwargs["raw_policies"]) == expected_policy_count
+            else:
+                mocked_reconcile.assert_not_called()
+
+    @patch("charm.KubernetesResourceHandler")
+    @patch(
+        "charm.KubernetesServicePatch",
+        lambda x, y, service_name, service_type, refresh_event: None,
+    )
+    @patch("charm.delete_many")
+    def test_auth_policy_reconcile_called_on_remove(
+        self,
+        delete_many: MagicMock,
+        _: MagicMock,
+        harness,
+        mock_lightkube_client: MagicMock,
+    ):
+        """Test that PolicyResourceManager.reconcile is called with empty policies on remove."""
+        # arrange:
+
+        harness.begin()
+        with patch.object(
+            harness.charm._authorization_policy_resource_manager,
+            "reconcile",
+        ) as mocked_reconcile:
+            # act:
+
+            harness.charm.on.remove.emit()
+
+            # assert:
+
+            mocked_reconcile.assert_called_once()
+            kwargs = mocked_reconcile.call_args.kwargs
+            assert kwargs["policies"] == []
+            assert kwargs["raw_policies"] == []
+
+    @patch("charm.KubernetesResourceHandler")
+    @patch(
+        "charm.KubernetesServicePatch",
+        lambda x, y, service_name, service_type, refresh_event: None,
+    )
+    @patch("charm.ServiceMeshConsumer")
+    @pytest.mark.parametrize(
+        "exception_type,exception_msg",
+        [
+            (RuntimeError, "RuntimeError due to invalid policy!"),
+            (TypeError, "TypeError due to invalid type!"),
+        ],
+    )
+    def test_auth_policy_validation_error_handling(
+        self,
+        _: MagicMock,
+        __: MagicMock,
+        harness,
+        mock_lightkube_client: MagicMock,
+        exception_type,
+        exception_msg,
+    ):
+        """Test AuthorizationPolicy raises exceptions on validation errors."""
+        # arrange:
+
+        harness.begin()
+        rel_id = harness.add_relation(
+            SERVICE_MESH_RELATION_ENDPOINT, SERVICE_MESH_RELATION_PROVIDER
+        )
+        harness.add_relation_unit(rel_id, f"{SERVICE_MESH_RELATION_PROVIDER}/0")
+        with patch.object(
+            harness.charm._authorization_policy_resource_manager,
+            "_validate_raw_policies",
+        ) as mocked_validate_raw_policies:
+            # act (and assert exception raised):
+
+            mocked_validate_raw_policies.side_effect = exception_type(exception_msg)
+            with pytest.raises(GenericCharmRuntimeError) as exc_info:
+                relation = harness.charm.framework.model.get_relation(
+                    SERVICE_MESH_RELATION_ENDPOINT, rel_id
+                )
+                harness.charm.on[SERVICE_MESH_RELATION_ENDPOINT].relation_changed.emit(relation)
+
+            # assert (the rest):
+
+            assert "Error validating raw policies" in str(exc_info.value)

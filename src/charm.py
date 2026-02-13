@@ -9,12 +9,18 @@ import yaml
 from charmed_kubeflow_chisme.exceptions import ErrorWithStatus, GenericCharmRuntimeError
 from charmed_kubeflow_chisme.kubernetes import KubernetesResourceHandler
 from charmed_kubeflow_chisme.lightkube.batch import delete_many
+from charmed_kubeflow_chisme.service_mesh import generate_allow_all_authorization_policy
+from charms.istio_beacon_k8s.v0.service_mesh import (
+    MeshType,
+    PolicyResourceManager,
+    ServiceMeshConsumer,
+)
 from charms.observability_libs.v1.kubernetes_service_patch import KubernetesServicePatch
 from charms.resource_dispatcher.v0.kubernetes_manifests import KubernetesManifestsProvider
-from lightkube import ApiError
+from lightkube import ApiError, Client
 from lightkube.generic_resource import load_in_cluster_generic_resources
 from lightkube.models.core_v1 import ServicePort
-from ops import UpgradeCharmEvent, main
+from ops import RelationEvent, UpgradeCharmEvent, main
 from ops.charm import CharmBase
 from ops.framework import EventBase
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus
@@ -25,6 +31,7 @@ DISPATCHER_RESOURCES_PATH = "/var/lib/pebble/default/resources"  # NOTE: in Pebb
 PODDEFAULTS_RELATION_NAME = "pod-defaults"
 SECRETS_RELATION_NAME = "secrets"
 SERVICEACCOUNTS_RELATION_NAME = "service-accounts"
+SERVICE_MESH_RELATION_NAME = "service-mesh"
 ROLES_RELATION_NAME = "roles"
 ROLEBINDINGS_RELATION_NAME = "role-bindings"
 
@@ -36,6 +43,8 @@ class ResourceDispatcherOperator(CharmBase):
         super().__init__(*args)
 
         self.logger = logging.getLogger(__name__)
+
+        self._app_name = self.app.name
         self._namespace = self.model.name
         self._lightkube_field_manager = "lightkube"
         self._name = self.model.app.name
@@ -93,6 +102,41 @@ class ResourceDispatcherOperator(CharmBase):
             self._rolebindings_manifests_provider,
         ]:
             self.framework.observe(provider.on.updated, self._on_event)
+
+        # for an ambient-mode service mesh:
+
+        self._mesh = ServiceMeshConsumer(
+            self, policies=None  # custom AuthorizationPolicies managed below
+        )
+
+        self._authorization_policy_resource_manager = PolicyResourceManager(
+            charm=self,
+            lightkube_client=Client(field_manager=f"{self._app_name}-{self._namespace}"),
+            labels={
+                "app.kubernetes.io/instance": f"{self._app_name}-{self._namespace}",
+                "kubernetes-resource-handler-scope": f"{self._app_name}-allow-all",
+            },
+            logger=self.logger,
+        )
+
+        # to update AuthorizationPolicies when the ambient-mode relation with the service mesh
+        # provider is updated:
+        for event in (
+            self.on[SERVICE_MESH_RELATION_NAME].relation_changed,
+            self.on[SERVICE_MESH_RELATION_NAME].relation_broken,
+        ):
+            self.framework.observe(event, self._on_service_mesh_relation_events)
+
+        # NOTE: a custom AuthorizationPolicy that allows any incoming traffic to the workload is
+        # defined here (and applied below) because it is required to receive API calls from
+        # Metacontroller, whose webhook Resource Dispatcher implements, as Metacontroller does
+        # not have Juju relations with Resource Dispatcher (yet, at the time of writing) and is
+        # therefore not possible to allow traffic from one to the other via neither the
+        # AppPolicy nor the UnitPolicy by istio_beacon_k8s.v0.service_mesh
+        self._allow_all_to_workload_auth_policy = generate_allow_all_authorization_policy(
+            app_name=self._app_name,
+            namespace=self._namespace,
+        )
 
     @property
     def container(self):
@@ -294,9 +338,49 @@ class ResourceDispatcherOperator(CharmBase):
             return
         self.model.unit.status = ActiveStatus()
 
+    @property
+    def ambient_mesh_enabled(self) -> bool:
+        """Whether the relation with the ambient-mode service-mesh provider is setup."""
+        if self.model.get_relation(SERVICE_MESH_RELATION_NAME):
+            return True
+        return False
+
+    def _on_service_mesh_relation_events(self, event: RelationEvent) -> None:
+        """Update AuthorizationPolicies according to service-mesh relation changes."""
+        self._check_leader()
+
+        # verifying that the defined AuthorizationPolicy is valid (i.e. supported):
+        try:
+            self._authorization_policy_resource_manager._validate_raw_policies(
+                [self._allow_all_to_workload_auth_policy]
+            )
+        except (RuntimeError, TypeError) as e:
+            raise GenericCharmRuntimeError(f"Error validating raw policies: {e}")
+
+        # ensuring the allow-all AuthorizationPolicies is in place (only) when in ambient mode:
+        policies = []
+        if self.ambient_mesh_enabled:
+            self.logger.info("Ambient mode enabled, creating the allow-all policy...")
+            policies.append(self._allow_all_to_workload_auth_policy)
+        else:
+            self.logger.info("Ambient mode disabled, removing the allow-all policy...")
+        self._authorization_policy_resource_manager.reconcile(
+            policies=[], mesh_type=MeshType.istio, raw_policies=policies
+        )
+
+        self.model.unit.status = ActiveStatus()
+
     def _on_remove(self, _):
         """Remove all resources."""
+        self._check_leader()
+
         self.unit.status = MaintenanceStatus("Removing K8S resources")
+
+        # remove all AuthorizationPolicies that target the workload:
+        self._authorization_policy_resource_manager.reconcile(
+            policies=[], mesh_type=MeshType.istio, raw_policies=[]
+        )
+
         k8s_resources_manifests = self.k8s_resource_handler.render_manifests()
         try:
             delete_many(self.k8s_resource_handler.lightkube_client, k8s_resources_manifests)

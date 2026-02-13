@@ -82,11 +82,19 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        tox-env:
-          - integration-charm
-          - integration-upgrade-happy-path
-          - integration-upgrade-erronous-path
-    name: Integration Test (${{ matrix.tox-env }})
+        tox-env-istio-mode:
+          - integration
+          - integration-ambient
+        tox-env-type:
+          - charm
+          - upgrade-happy-path
+          - upgrade-erronous-path
+        exclude:
+          - tox-env-istio-mode: integration-ambient
+            tox-env-type: upgrade-happy-path
+          - tox-env-istio-mode: integration-ambient
+            tox-env-type: upgrade-erronous-path
+    name: Integration Test (${{ matrix.tox-env-type }} | ${{ matrix.tox-env-istio-mode }})
     runs-on: ubuntu-24.04
     needs:
       - build
@@ -110,7 +118,7 @@ jobs:
         merge-multiple: true
         
     - name: Run integration tests
-      run: tox -vve ${{ matrix.tox-env }}
+      run: tox -vve ${{ matrix.tox-env-istio-mode }}-${{ matrix.tox-env-type }}
 
     # On failure, capture debugging resources
     - name: Get all
@@ -122,9 +130,9 @@ jobs:
       if: failure()
 
     - name: Get workload logs
-      run: kubectl logs --tail 100 -ntesting -lapp.kubernetes.io/name=resource-dispatcher
+      run: kubectl logs --tail 100 -ntesting -lapp.kubernetes.io/name=resource-dispatcher -c resource-dispatcher
       if: failure()
 
     - name: Get operator logs
-      run: kubectl logs --tail 100 -ntesting -loperator.juju.is/name=resource-dispatcher
+      run: kubectl logs --tail 100 -ntesting -lapp.kubernetes.io/name=resource-dispatcher -c charm
       if: failure()

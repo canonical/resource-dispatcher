@@ -208,7 +208,7 @@ version = "0.7.0"
 description = "Reusable constraint types to use with typing.Annotated"
 optional = false
 python-versions = ">=3.8"
-groups = ["integration"]
+groups = ["charm", "integration"]
 files = [
     {file = "annotated_types-0.7.0-py3-none-any.whl", hash = "sha256:1f02e8b43a8fbbc3f3e0d4f0f4bfc8131bcb4eebe8849b8e5c773f3a1c582a53"},
     {file = "annotated_types-0.7.0.tar.gz", hash = "sha256:aff07c09a53a08bc8cfccb9c85b05f1aa9a2a6f23728d790723543408344ce89"},
@@ -560,24 +560,26 @@ pycparser = {version = "*", markers = "implementation_name != \"PyPy\""}
 
 [[package]]
 name = "charmed-kubeflow-chisme"
-version = "0.4.21"
+version = "0.4.24"
 description = "A collection of helpers for Charms maintained by the Charmed Kubeflow team"
 optional = false
 python-versions = ">=3.6"
 groups = ["charm", "integration"]
 files = [
-    {file = "charmed_kubeflow_chisme-0.4.21-py3-none-any.whl", hash = "sha256:a87b62d73b445a43bcfc20701762174232a5f06a282a563039a1f24f20a2ffc5"},
-    {file = "charmed_kubeflow_chisme-0.4.21.tar.gz", hash = "sha256:951a59e74d97335e868fa9fc476971ce9aba88bd7393650bc20fa2f7a57f5737"},
+    {file = "charmed_kubeflow_chisme-0.4.24-py3-none-any.whl", hash = "sha256:f30c1a47419c9b5dbc04cd387fb85caf414b4b4ab3e3bea638b3090074ad257a"},
+    {file = "charmed_kubeflow_chisme-0.4.24.tar.gz", hash = "sha256:390ab912eeae5f7f37dc227d46f25672933f0b70710706d47497f0c86bbd9183"},
 ]
 
 [package.dependencies]
 aiohttp = ">=3.8,<4.0"
+charmed-service-mesh-helpers = ">=0.3.0"
 deepdiff = "<=6.2.1"
 httpx = "<0.28.0"
 jinja2 = "*"
 juju = "*"
 kubernetes = ">=30.1.0"
 lightkube = ">0.10.0"
+lightkube-extensions = ">=0.3.0"
 ops = ">1.2.0"
 "ruamel.yaml" = "*"
 serialized-data-interface = "*"
@@ -585,6 +587,25 @@ tenacity = "*"
 
 [package.extras]
 test = ["black", "pytest"]
+
+[[package]]
+name = "charmed-service-mesh-helpers"
+version = "0.5.0"
+description = "Helpers for the Service Mesh charms."
+optional = false
+python-versions = "~=3.8"
+groups = ["charm", "integration"]
+files = [
+    {file = "charmed_service_mesh_helpers-0.5.0-py3-none-any.whl", hash = "sha256:7fcf98434b1ba7a47cae118037a9977ada574cfe3533ba634b5a0cd66ef6cd49"},
+    {file = "charmed_service_mesh_helpers-0.5.0.tar.gz", hash = "sha256:b5188e9c915bc5c816e2a128d544ef86919077f99408fe5598b367892b42eb45"},
+]
+
+[package.dependencies]
+ops = ">=2.5,<3.0"
+pydantic = ">=2"
+
+[package.extras]
+dev = ["codespell", "coverage[toml]", "pyright", "pytest", "ruff"]
 
 [[package]]
 name = "charset-normalizer"
@@ -1054,14 +1075,14 @@ tests = ["pytest", "pytest-cov", "pytest-xdist"]
 
 [[package]]
 name = "databricks-sdk"
-version = "0.84.0"
+version = "0.85.0"
 description = "Databricks SDK for Python (Beta)"
 optional = false
 python-versions = ">=3.7"
 groups = ["integration"]
 files = [
-    {file = "databricks_sdk-0.84.0-py3-none-any.whl", hash = "sha256:a1391d0887c3347ca57bf3d932c809c5657e17954aca0d7f2ca52820611af20a"},
-    {file = "databricks_sdk-0.84.0.tar.gz", hash = "sha256:d5b73291f16e0cefa6356b55980d76c892d5cedb17f125d9a1967448a6e82b8d"},
+    {file = "databricks_sdk-0.85.0-py3-none-any.whl", hash = "sha256:2a2da176a55d55fb84696e0255520e99e838dd942b97b971dff724041fe00c64"},
+    {file = "databricks_sdk-0.85.0.tar.gz", hash = "sha256:0b5f415fba69ea0c5bfc4d0b21cb3366c6b66f678e78e4b3c94cbcf2e9e0972f"},
 ]
 
 [package.dependencies]
@@ -1117,14 +1138,14 @@ websockets = ["websocket-client (>=1.3.0)"]
 
 [[package]]
 name = "fastapi"
-version = "0.128.0"
+version = "0.128.1"
 description = "FastAPI framework, high performance, easy to learn, fast to code, ready for production"
 optional = false
 python-versions = ">=3.9"
 groups = ["integration"]
 files = [
-    {file = "fastapi-0.128.0-py3-none-any.whl", hash = "sha256:aebd93f9716ee3b4f4fcfe13ffb7cf308d99c9f3ab5622d8877441072561582d"},
-    {file = "fastapi-0.128.0.tar.gz", hash = "sha256:1cc179e1cef10a6be60ffe429f79b829dce99d8de32d7acb7e6c8dfdf7f2645a"},
+    {file = "fastapi-0.128.1-py3-none-any.whl", hash = "sha256:ee82146bbf91ea5bbf2bb8629e4c6e056c4fbd997ea6068501b11b15260b50fb"},
+    {file = "fastapi-0.128.1.tar.gz", hash = "sha256:ce5be4fa26d4ce6f54debcc873d1fb8e0e248f5c48d7502ba6c61457ab2dc766"},
 ]
 
 [package.dependencies]
@@ -2080,6 +2101,22 @@ PyYAML = "*"
 dev = ["pytest", "pytest-asyncio", "respx"]
 
 [[package]]
+name = "lightkube-extensions"
+version = "0.3.0"
+description = "A collection of helpers and shared code for using Lightkube."
+optional = false
+python-versions = "~=3.8"
+groups = ["charm", "integration"]
+files = [
+    {file = "lightkube_extensions-0.3.0-py3-none-any.whl", hash = "sha256:580178f937be39b378158264e926d6f188a05d13dd17d8491c2f1f6a234ebaf8"},
+    {file = "lightkube_extensions-0.3.0.tar.gz", hash = "sha256:997c5f7457c297449083ee66dce498a1a5a6423d58d4f87258cf68da04bb99f2"},
+]
+
+[package.dependencies]
+jinja2 = "*"
+lightkube = ">=0.11.0"
+
+[[package]]
 name = "lightkube-models"
 version = "1.35.0.8"
 description = "Models and Resources for lightkube module"
@@ -2781,24 +2818,25 @@ typing-extensions = ">=4.5.0"
 
 [[package]]
 name = "ops"
-version = "3.5.1"
+version = "2.23.1"
 description = "The Python library behind great charms"
 optional = false
-python-versions = ">=3.10"
+python-versions = ">=3.8"
 groups = ["charm", "integration"]
 files = [
-    {file = "ops-3.5.1-py3-none-any.whl", hash = "sha256:890dd7bf33d1381afeed0e484d02c7bb13ad3945dcc7b723e8d73e4bba0ff94c"},
-    {file = "ops-3.5.1.tar.gz", hash = "sha256:376ef51d35d45b376795196851550e209565e922e58af8ac491cf23bc8b46498"},
+    {file = "ops-2.23.1-py3-none-any.whl", hash = "sha256:fdf58163beafd25180c12a4c7efaf1e76e5f8710508a97840c07055bb78b0c77"},
+    {file = "ops-2.23.1.tar.gz", hash = "sha256:aecacd67ef7ca913f63f397e0330bfa93d70529a3ef71ed2d99e2bc232564ae3"},
 ]
 
 [package.dependencies]
+importlib-metadata = "*"
 opentelemetry-api = ">=1.0,<2.0"
 PyYAML = "==6.*"
 websocket-client = "==1.*"
 
 [package.extras]
-testing = ["ops-scenario (==8.5.1)"]
-tracing = ["ops-tracing (==3.5.1)"]
+testing = ["ops-scenario (==7.23.1)"]
+tracing = ["ops-tracing (==2.23.1)"]
 
 [[package]]
 name = "ordered-set"
@@ -3407,7 +3445,7 @@ version = "2.12.5"
 description = "Data validation using Python type hints"
 optional = false
 python-versions = ">=3.9"
-groups = ["integration"]
+groups = ["charm", "integration"]
 files = [
     {file = "pydantic-2.12.5-py3-none-any.whl", hash = "sha256:e561593fccf61e8a20fc46dfc2dfe075b8be7d0188df33f221ad1f0139180f9d"},
     {file = "pydantic-2.12.5.tar.gz", hash = "sha256:4d351024c75c0f085a9febbb665ce8c0c6ec5d30e903bdb6394b7ede26aebb49"},
@@ -3429,7 +3467,7 @@ version = "2.41.5"
 description = "Core functionality for Pydantic validation and serialization"
 optional = false
 python-versions = ">=3.9"
-groups = ["integration"]
+groups = ["charm", "integration"]
 files = [
     {file = "pydantic_core-2.41.5-cp310-cp310-macosx_10_12_x86_64.whl", hash = "sha256:77b63866ca88d804225eaa4af3e664c5faf3568cea95360d21f4725ab6e07146"},
     {file = "pydantic_core-2.41.5-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:dfa8a0c812ac681395907e71e1274819dec685fec28273a28905df579ef137e2"},
@@ -4372,14 +4410,14 @@ full = ["httpx (>=0.27.0,<0.29.0)", "itsdangerous", "jinja2", "python-multipart 
 
 [[package]]
 name = "tenacity"
-version = "9.1.2"
+version = "9.1.3"
 description = "Retry code until it succeeds"
 optional = false
-python-versions = ">=3.9"
+python-versions = ">=3.10"
 groups = ["charm", "integration"]
 files = [
-    {file = "tenacity-9.1.2-py3-none-any.whl", hash = "sha256:f77bf36710d8b73a50b2dd155c97b870017ad21afe6ab300326b0371b3b05138"},
-    {file = "tenacity-9.1.2.tar.gz", hash = "sha256:1169d376c297e7de388d18b4481760d478b0e99a777cad3a9c86e556f4b697cb"},
+    {file = "tenacity-9.1.3-py3-none-any.whl", hash = "sha256:51171cfc6b8a7826551e2f029426b10a6af189c5ac6986adcd7eb36d42f17954"},
+    {file = "tenacity-9.1.3.tar.gz", hash = "sha256:a6724c947aa717087e2531f883bde5c9188f603f6669a9b8d54eb998e604c12a"},
 ]
 
 [package.extras]
@@ -4444,7 +4482,7 @@ version = "0.4.2"
 description = "Runtime typing introspection tools"
 optional = false
 python-versions = ">=3.9"
-groups = ["integration"]
+groups = ["charm", "integration"]
 files = [
     {file = "typing_inspection-0.4.2-py3-none-any.whl", hash = "sha256:4ed1cacbdc298c220f1bd249ed5287caa16f34d44ef4e9c3d0cbad5b521545e7"},
     {file = "typing_inspection-0.4.2.tar.gz", hash = "sha256:ba561c48a67c5958007083d386c3295464928b01faa735ab8547c5692e87f464"},
@@ -4805,4 +4843,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<4.0"
-content-hash = "a1a2967c691f996660e82eaddb21554c3e3caad70621eb5d605eee3bcc906ac9"
+content-hash = "6b67e70301b940d29a97619e9591ed21b7c18ae8d78f19b5b48a5f4f02e9eac8"

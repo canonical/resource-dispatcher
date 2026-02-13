@@ -10,7 +10,11 @@ import jubilant
 import lightkube
 import pytest
 import yaml
-from charmed_kubeflow_chisme.testing import assert_security_context, get_pod_names
+from charmed_kubeflow_chisme.testing import (
+    assert_security_context,
+    generate_container_securitycontext_map,
+    get_pod_names,
+)
 from lightkube.core.exceptions import ApiError
 from lightkube.generic_resource import create_namespaced_resource
 from lightkube.resources.core_v1 import Secret, ServiceAccount
@@ -35,10 +39,7 @@ TESTING_LABELS = ["user.kubeflow.org/enabled"]  # Might be more than one in the 
 SECRET_NAME = "mlpipeline-minio-artifact"
 SERVICE_ACCOUNT_NAME = MANIFESTS_TESTER_CONFIG["options"]["service_account_name"]["default"]
 
-JUJU_USER_ID = 170
-CONTAINERS_SECURITY_CONTEXT_MAP = {
-    "charm": {"runAsUser": JUJU_USER_ID, "runAsGroup": JUJU_USER_ID}
-}
+CONTAINERS_SECURITY_CONTEXT_MAP = generate_container_securitycontext_map(METADATA)
 
 TESTER1_SECRET_NAMES = ["mlpipeline-minio-artifact", "seldon-rclone-secret"]
 TESTER2_SECRET_NAMES = ["mlpipeline-minio-artifact2", "seldon-rclone-secret2"]
@@ -72,7 +73,6 @@ def test_build_and_deploy_dispatcher_charm(juju: jubilant.Juju, resource_dispatc
 
 
 @pytest.mark.parametrize("container_name", list(CONTAINERS_SECURITY_CONTEXT_MAP.keys()))
-@pytest.mark.abort_on_fail
 def test_container_security_context(
     juju: jubilant.Juju,
     lightkube_client: lightkube.Client,

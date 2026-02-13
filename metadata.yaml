@@ -11,11 +11,13 @@ charm-user: non-root
 containers:
   resource-dispatcher:
     resource: oci-image
+    uid: 584792
+    gid: 584792
 resources:
   oci-image:
     type: oci-image
     description: Backing OCI image
-    upstream-source: charmedkubeflow/resource-dispatcher:1.0-22.04
+    upstream-source: docker.io/charmedkubeflow/resource-dispatcher:3.1-19fc3ab
 provides:
   secrets:
     interface: kubernetes_manifest

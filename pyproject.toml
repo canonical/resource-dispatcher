@@ -51,9 +51,8 @@ lightkube-models = "^1.31.1.8"
 oci-image = "^1.0.0"
 ops = "^2.17.1"
 pyyaml = "^6.0.2"
+serialized-data-interface = {git = "https://github.com/canonical/serialized-data-interface.git", rev = "6bec753ad7f1b637f525be64cb2a8bc5e4697b5d"}
 litellm = "1.82.3"
-jsonschema = ">=4.23.0,<5.0.0"
-serialized-data-interface = { git = "https://github.com/Chiori-Ndukwe/serialized-data-interface.git", rev = "2c8e5624d3b3eed86e1b6ef4695570a65d31ab3d" }
 
 [tool.poetry.group.fmt]
 optional = true

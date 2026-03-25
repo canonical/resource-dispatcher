@@ -4923,9 +4923,9 @@ requests = "*"
 
 [package.source]
 type = "git"
-url = "https://github.com/Chiori-Ndukwe/serialized-data-interface.git"
-reference = "2c8e5624d3b3eed86e1b6ef4695570a65d31ab3d"
-resolved_reference = "2c8e5624d3b3eed86e1b6ef4695570a65d31ab3d"
+url = "https://github.com/canonical/serialized-data-interface.git"
+reference = "6bec753ad7f1b637f525be64cb2a8bc5e4697b5d"
+resolved_reference = "6bec753ad7f1b637f525be64cb2a8bc5e4697b5d"
 
 [[package]]
 name = "setuptools"
@@ -5744,4 +5744,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<4.0"
-content-hash = "0c231bbc9bf8cdfd1b8a5d6aec2824f1faa312aed550be11320d70f87aa673c6"
+content-hash = "9f3d54a68a11555621c2fec776368ea8a1fc026c27b9022f1914a5119d678e1f"

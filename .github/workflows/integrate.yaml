@@ -4,7 +4,7 @@ name: CI
 on:
   workflow_call:
     secrets:
-      charmcraft-credentials:
+      CHARMCRAFT_CREDENTIALS:
         required: true
 
 jobs:
@@ -109,7 +109,7 @@ jobs:
       with:
         pattern: ${{ needs.build.outputs.artifact-prefix }}-*
         merge-multiple: true
-        
+
     - name: Run integration tests
       run: tox -vve ${{ matrix.tox-env }}
 

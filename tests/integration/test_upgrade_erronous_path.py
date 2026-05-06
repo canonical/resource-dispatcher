@@ -28,6 +28,7 @@ from lightkube.resources.rbac_authorization_v1 import Role, RoleBinding
 from .charms_dependencies import METACONTROLLER_OPERATOR, RESOURCE_DISPATCHER_NO_SECRET
 from .helpers import (
     RESOURCE_DISPATCHER_CHARM_NAME,
+    RESOURCE_DISPATCHER_NO_SECRET_OCI_IMAGE,
     RESOURCE_DISPATCHER_NO_SECRET_REVISION,
     deploy_k8s_resources,
 )
@@ -85,6 +86,7 @@ def test_deploy_resource_dispatcher_charm(juju: jubilant.Juju):
         app=RESOURCE_DISPATCHER_CHARM_NAME,
         channel=RESOURCE_DISPATCHER_NO_SECRET.channel,
         revision=RESOURCE_DISPATCHER_NO_SECRET_REVISION,
+        resources={"oci-image": RESOURCE_DISPATCHER_NO_SECRET_OCI_IMAGE},
         trust=True,
     )
     status = juju.wait(
@@ -99,7 +101,7 @@ def test_deploy_resource_dispatcher_charm(juju: jubilant.Juju):
 
 
 def test_build_and_deploy_tester_charm(juju: jubilant.Juju, manifest_tester_no_secret_charm: Path):
-    """Deploy manifest-tester charm, that uses kubernetes_manifest lib 0.2."""
+    """Deploy manifest-tester charm, that uses kubernetes_manifest lib 0.1."""
     juju.deploy(
         charm=manifest_tester_no_secret_charm,
         app=MANIFEST_TESTER_CHARM,
@@ -206,6 +208,15 @@ def test_upgrade_resource_dispatcher(juju: jubilant.Juju, resource_dispatcher_ch
     )
 
 
+def test_profile_scoped_secrets(
+    juju: jubilant.Juju, lightkube_client: lightkube.Client, namespace: str
+):
+    """Test that profile scoped secret (mlpipeline-minio-artifact) created previously by resource-dispatcher are removed."""
+    with pytest.raises(ApiError) as e_info:
+        lightkube_client.get(Secret, MINIO_SECRET_NAME_NEW, namespace=namespace)
+    assert "not found" in str(e_info)
+
+
 def test_integrate_new_relations_with_resource_dispatcher(
     juju: jubilant.Juju, lightkube_client: lightkube.Client, namespace: str
 ):
@@ -250,6 +261,7 @@ def test_change_in_manifest_reflected_again(
 
     with pytest.raises(ApiError) as e_info:
         lightkube_client.get(ServiceAccount, SERVICE_ACCOUNT_NAME, namespace=namespace)
+    assert "not found" in str(e_info)
     service_account = lightkube_client.get(
         ServiceAccount, SERVICE_ACCOUNT_NAME_2, namespace=namespace
     )

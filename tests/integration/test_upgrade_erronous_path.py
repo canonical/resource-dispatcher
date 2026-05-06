@@ -212,6 +212,9 @@ def test_profile_scoped_secrets(
     juju: jubilant.Juju, lightkube_client: lightkube.Client, namespace: str
 ):
     """Test that profile scoped secret (mlpipeline-minio-artifact) created previously by resource-dispatcher are removed."""
+    time.sleep(
+        30
+    )  # sync can take up to 10 seconds for reconciliation loop to trigger (+ time to create namespace)
     with pytest.raises(ApiError) as e_info:
         lightkube_client.get(Secret, MINIO_SECRET_NAME_NEW, namespace=namespace)
     assert "not found" in str(e_info)

@@ -108,7 +108,7 @@ def secondary_namespace(lightkube_client: lightkube.Client):
 
     yield obj.metadata.name
 
-    delete_all_from_yaml(yaml_text, lightkube_client)
+    delete_all_from_yaml(yaml.safe_dump(namespace), lightkube_client)
 
 
 @pytest.fixture(scope="module")

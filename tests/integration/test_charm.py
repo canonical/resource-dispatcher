@@ -62,6 +62,10 @@ TESTER2_ROLE_NAMES = ["test2-role"]
 TESTER1_ROLEBINDING_NAMES = ["test1-rolebinding"]
 TESTER2_ROLEBINDING_NAMES = ["test2-rolebinding"]
 
+PROFILE_SCOPED_SECRET1 = MINIO_SECRET_NAME1
+PROFILE_SCOPED_SECRET2 = MINIO_SECRET_NAME3
+PROFILE_AGNOSTIC_SECRET1 = "mlpipeline-minio-artifact2"
+PROFILE_AGNOSTIC_SECRET2 = "mlpipeline-minio-artifact4"
 
 PodDefault = create_namespaced_resource("kubeflow.org", "v1alpha1", "PodDefault", "poddefaults")
 
@@ -151,7 +155,12 @@ def test_build_and_deploy_tester_charms(
     service_account_name_1: str,
     service_account_name_2: str,
 ):
-    """Deploy manifest-tester-no-secret charm, that uses kubernetes_manifest lib 0.1."""
+    """Deploy tester charms.
+
+    The parametrized test will first deploy the manifest-tester charm with the new library that supports secrets,
+    and then deploy the manifest-tester-no-secret charm with the old library that does not support secrets.
+    This allows us to test both types of charms in the subsequent tests.
+    """
     tester_charm = request.getfixturevalue(tester_charm_fixture)
     juju.deploy(
         charm=tester_charm,
@@ -308,6 +317,50 @@ def test_manifests_created_from_both_tester_charms(
     for name in expected_tester_rolebindings_1 + expected_tester_rolebindings_2:
         rb = lightkube_client.get(RoleBinding, name, namespace=namespace)
         assert rb != None
+
+
+@pytest.mark.parametrize(
+    "profile_scoped_secret,profile_agnostic_secret",
+    [
+        (PROFILE_SCOPED_SECRET1, PROFILE_AGNOSTIC_SECRET1),
+        (PROFILE_SCOPED_SECRET2, PROFILE_AGNOSTIC_SECRET2),
+    ],
+)
+def test_manifest_namespace_scoping(
+    lightkube_client: lightkube.Client,
+    profile_namespaces: tuple[str, str],
+    profile_scoped_secret: str,
+    profile_agnostic_secret: str,
+) -> None:
+    """Validate pinned manifests apply to one namespace while unpinned manifests apply to all profiles."""
+    primary_namespace, secondary_namespace = profile_namespaces
+
+    time.sleep(
+        30
+    )  # sync can take up to 10 seconds for reconciliation loop to trigger (+ time to create namespaces)
+
+    # pinned manifests are applied only to the namespace explicitly set in metadata.namespace
+    pinned_secret = lightkube_client.get(
+        Secret, profile_scoped_secret, namespace=primary_namespace
+    )
+    assert pinned_secret != None
+
+    # logger.error("sleeping...")
+    # time.sleep(10 * 60)
+
+    with pytest.raises(ApiError) as e_info:
+        lightkube_client.get(Secret, profile_scoped_secret, namespace=secondary_namespace)
+    assert "not found" in str(e_info)
+
+    # manifests without metadata.namespace are applied to all profile namespaces
+    unpinned_secret_primary = lightkube_client.get(
+        Secret, profile_agnostic_secret, namespace=primary_namespace
+    )
+    unpinned_secret_secondary = lightkube_client.get(
+        Secret, profile_agnostic_secret, namespace=secondary_namespace
+    )
+    assert unpinned_secret_primary != None
+    assert unpinned_secret_secondary != None
 
 
 @pytest.mark.parametrize(

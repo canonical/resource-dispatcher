@@ -17,6 +17,7 @@ RESOURCE_DISPATCHER_CHARM_NAME = "resource-dispatcher"
 RESOURCE_DISPATCHER_NO_SECRET_REVISION = (
     402  # Revision that still uses kubernetes_manifests lib 0.1
 )
+RESOURCE_DISPATCHER_NO_SECRET_OCI_IMAGE = "charmedkubeflow/resource-dispatcher:1.0-22.04"  # Image before feature for roles and rolebindings were added
 
 
 def safe_load_file_to_text(filename: str) -> str:

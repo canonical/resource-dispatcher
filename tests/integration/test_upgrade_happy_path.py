@@ -24,6 +24,7 @@ from lightkube.resources.rbac_authorization_v1 import Role, RoleBinding
 from .charms_dependencies import METACONTROLLER_OPERATOR, RESOURCE_DISPATCHER_NO_SECRET
 from .helpers import (
     RESOURCE_DISPATCHER_CHARM_NAME,
+    RESOURCE_DISPATCHER_NO_SECRET_OCI_IMAGE,
     RESOURCE_DISPATCHER_NO_SECRET_REVISION,
     deploy_k8s_resources,
 )
@@ -40,7 +41,7 @@ MINIO_SECRET_NAME_NEW = "mlpipeline-minio-artifact"
 SERVICE_ACCOUNT_NAME = MANIFESTS_TESTER_CONFIG["options"]["service_account_name"]["default"]
 SERVICE_ACCOUNT_NAME_2 = SERVICE_ACCOUNT_NAME + "-2"
 SERVICE_ACCOUNT_NAME_3 = SERVICE_ACCOUNT_NAME + "-3"
-
+PROFILE_SCOPED_SECRET = MINIO_SECRET_NAME_NEW
 
 TESTER_SECRET_NAMES_OLD = ["mlpipeline-minio-artifact3", "seldon-rclone-secret3"]
 TESTER_SECRET_NAMES_NEW = ["mlpipeline-minio-artifact", "seldon-rclone-secret"]
@@ -81,6 +82,7 @@ def test_deploy_resource_dispatcher_charm(juju: jubilant.Juju):
         app=RESOURCE_DISPATCHER_CHARM_NAME,
         channel=RESOURCE_DISPATCHER_NO_SECRET.channel,
         revision=RESOURCE_DISPATCHER_NO_SECRET_REVISION,
+        resources={"oci-image": RESOURCE_DISPATCHER_NO_SECRET_OCI_IMAGE},
         trust=True,
     )
     status = juju.wait(
@@ -95,7 +97,7 @@ def test_deploy_resource_dispatcher_charm(juju: jubilant.Juju):
 
 
 def test_build_and_deploy_tester_charm(juju: jubilant.Juju, manifest_tester_no_secret_charm: Path):
-    """Deploy manifest-tester charm, that uses kubernetes_manifest lib 0.2."""
+    """Deploy manifest-tester charm, that uses kubernetes_manifest lib 0.1."""
     juju.deploy(
         charm=manifest_tester_no_secret_charm,
         app=MANIFEST_TESTER_CHARM,
@@ -279,3 +281,19 @@ def test_change_in_manifest_reflected_again(
         ServiceAccount, SERVICE_ACCOUNT_NAME_3, namespace=namespace
     )
     assert service_account != None
+
+
+def test_profile_scoped_secrets(
+    juju: jubilant.Juju, lightkube_client: lightkube.Client, profile_namespaces: tuple[str, str]
+):
+    """Test that profile scoped secret (mlpipeline-minio-artifact) created previously by resource-dispatcher are removed."""
+    primary_profile, secondary_profile = profile_namespaces
+    time.sleep(
+        30
+    )  # sync can take up to 10 seconds for reconciliation loop to trigger (+ time to create namespace)
+    for name in TESTER_SECRET_NAMES_NEW:
+        secret = lightkube_client.get(Secret, name, namespace=primary_profile)
+        assert secret != None
+    with pytest.raises(ApiError) as e_info:
+        lightkube_client.get(Secret, PROFILE_SCOPED_SECRET, namespace=secondary_profile)
+    assert "not found" in str(e_info)

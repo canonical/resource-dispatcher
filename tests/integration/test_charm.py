@@ -126,7 +126,6 @@ def test_container_security_context(
     )
 
 
-def test_build_and_deploy_helper_charms(juju: jubilant.Juju, manifest_tester_charm: Path):
 @pytest.mark.parametrize(
     "tester_charm_fixture,tester_charm_name_1,tester_charm_name_2,service_account_name_1,service_account_name_2",
     [
@@ -229,8 +228,7 @@ def test_integrate_tester_with_resource_dispatcher(
         )
 
     status = juju.wait(
-        lambda status: jubilant.all_active(status) and jubilant.all_agents_idle(
-            status), delay=5
+        lambda status: jubilant.all_active(status) and jubilant.all_agents_idle(status), delay=5
     )
     assert (
         status.apps[RESOURCE_DISPATCHER_CHARM_NAME]

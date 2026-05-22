@@ -39,11 +39,29 @@ def pytest_addoption(parser):
         default=False,
         help="keep temporarily-created models",
     )
+    parser.addoption(
+        "--charm-path",
+        action="append",
+        default=[],
+        help="Path to a pre-built charm file (can be repeated)",
+    )
+
+
+def _find_charm_path(charm_paths: list[str], keyword: str, exclude: str = "") -> Path | None:
+    """Find a charm path from --charm-path options matching a keyword."""
+    for p in charm_paths:
+        path = Path(p)
+        if keyword in path.name and (not exclude or exclude not in path.name):
+            return path
+    return None
 
 
 @pytest.fixture(scope="module")
-def resource_dispatcher_charm() -> Path:
+def resource_dispatcher_charm(request) -> Path:
     """Path to the packed resource-dispatcher charm."""
+    charm_paths = request.config.getoption("--charm-path")
+    if path := _find_charm_path(charm_paths, "resource-dispatcher", exclude="manifests-tester"):
+        return path
     return get_or_build_charm(
         Path.cwd(),
         name="resource-dispatcher",
@@ -51,8 +69,11 @@ def resource_dispatcher_charm() -> Path:
 
 
 @pytest.fixture(scope="module")
-def manifest_tester_charm() -> Path:
+def manifest_tester_charm(request) -> Path:
     """Path to the packed manifest-tester charm with new lib that supports secrets."""
+    charm_paths = request.config.getoption("--charm-path")
+    if path := _find_charm_path(charm_paths, "manifests-tester", exclude="no-secret"):
+        return path
     return get_or_build_charm(
         Path.cwd() / "tests/integration/manifests-tester",
         name="manifest-tester",
@@ -60,8 +81,11 @@ def manifest_tester_charm() -> Path:
 
 
 @pytest.fixture(scope="module")
-def manifest_tester_no_secret_charm() -> Path:
+def manifest_tester_no_secret_charm(request) -> Path:
     """Path to the packed manifest-tester charm with old lib that does not support secrets."""
+    charm_paths = request.config.getoption("--charm-path")
+    if path := _find_charm_path(charm_paths, "no-secret"):
+        return path
     return get_or_build_charm(
         Path.cwd() / "tests/integration/manifests-tester-no-secret",
         name="manifest-tester-no-secret",

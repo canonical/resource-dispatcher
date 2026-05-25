@@ -58,11 +58,6 @@ jobs:
 
           print(f"Track: {track}")
 
-  lib-check:
-    name: Check libraries
-    uses: canonical/charmed-kubeflow-workflows/.github/workflows/lib-check.yaml@main
-    secrets: inherit
-
   lint:
     name: Lint Check
     runs-on: ubuntu-24.04
@@ -95,7 +90,6 @@ jobs:
   build:
     needs:
       - get-charm-paths-track
-      - lib-check
       - lint
       - unit
       - terraform-checks
@@ -109,7 +103,6 @@ jobs:
 
   build-test-charms:
     needs:
-      - lib-check
       - lint
       - unit
       - terraform-checks

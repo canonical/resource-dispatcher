@@ -1,49 +1,29 @@
 # Copyright 2025 Canonical Ltd.
 # See LICENSE file for licensing details.
-name: Release to latest/edge
+name: Release to Charmhub
 
 on:
   push:
     branches:
       - main
+      - track/**
 
 jobs:
-  ci:
+  ci-tests:
     uses: ./.github/workflows/ci.yaml
     secrets: inherit
-    permissions:
-      actions: read
-      contents: read
-
-  build:
-    name: Build charm
-    needs:
-      - ci
-    strategy:
-      matrix:
-        charm:
-          - .
-          - tests/integration/manifests-tester
-          - tests/integration/manifests-tester-no-secret
-    uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@v49.0.1
-    with:
-      path-to-charm-directory: ${{ matrix.charm }}
-      cache: true
-    permissions:
-      actions: read
-      contents: read
 
   release:
-    name: Release to latest/edge
+    name: Release charm
     needs:
-      - ci
-      - build
-    uses: canonical/data-platform-workflows/.github/workflows/release_charm.yaml@v49.0.1
+      - ci-tests
+    uses: canonical/data-platform-workflows/.github/workflows/release_charm_edge.yaml@v49.0.1
     with:
-      channel: latest/edge
-      artifact-prefix: ${{ needs.build.outputs.artifact-prefix }}
-      create-github-release: false
+      track: ${{ needs.ci-tests.outputs.track }}
+      artifact-prefix: ${{ needs.ci-tests.outputs.artifact-prefix }}
+      path-to-charm-directory: .
     secrets:
       charmhub-token: ${{ secrets.CHARMCRAFT_CREDENTIALS }}
     permissions:
-      contents: write
+      actions: read
+      contents: write  # Needed to create git tags

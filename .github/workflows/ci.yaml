@@ -2,15 +2,62 @@
 # See LICENSE file for licensing details.
 name: CI
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
-  push:
-    branches:
-      - main
-      - track/**
   pull_request:
-  workflow_dispatch:
+  schedule:
+    - cron: '0 8 * * TUE'
+  # Triggered on push by .github/workflows/release.yaml
+  workflow_call:
+    outputs:
+      artifact-prefix:
+        description: build_charm.yaml `artifact-prefix` output
+        value: ${{ jobs.build.outputs.artifact-prefix }}
+      charm-paths:
+        description: paths for all charms in this repo
+        value: ${{ jobs.get-charm-paths-track.outputs.charm-paths }}
+      track:
+        description: Charmhub track determined from branch name
+        value: ${{ jobs.get-charm-paths-track.outputs.track }}
 
 jobs:
+  get-charm-paths-track:
+    name: Get charm paths and track
+    runs-on: ubuntu-latest
+    outputs:
+      charm-paths: ${{ steps.get-charm-paths.outputs.charm-paths }}
+      track: ${{ steps.determine-track.outputs.track }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Get paths for all charms in this repo
+        id: get-charm-paths
+        uses: canonical/kubeflow-ci/actions/get-charm-paths@main
+      - name: Determine track
+        id: determine-track
+        shell: python
+        run: |
+          import os
+
+          if "${{ github.event_name }}" == "pull_request":
+              ref = "${{ github.base_ref }}"
+          else:
+              ref = "${{ github.ref_name }}"
+
+          if ref.startswith("track/"):
+              track = ref.removeprefix("track/")
+          else:
+              track = "latest"
+
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              f.write(f"track={track}\n")
+
+          print(f"Track: {track}")
+
   lib-check:
     name: Check libraries
     uses: canonical/charmed-kubeflow-workflows/.github/workflows/lib-check.yaml@main
@@ -47,6 +94,7 @@ jobs:
 
   build:
     needs:
+      - get-charm-paths-track
       - lib-check
       - lint
       - unit
@@ -62,6 +110,23 @@ jobs:
     with:
       path-to-charm-directory: ${{ matrix.charm }}
       cache: true
+    permissions:
+      actions: read
+      contents: read
+
+  release:
+    name: Release charm to Charmhub branch
+    if: ${{ github.event_name == 'pull_request' }}
+    needs:
+      - get-charm-paths-track
+      - build
+    uses: canonical/data-platform-workflows/.github/workflows/release_charm_pr.yaml@v49.0.1
+    with:
+      track: ${{ needs.get-charm-paths-track.outputs.track }}
+      artifact-prefix: ${{ needs.build.outputs.artifact-prefix }}
+      path-to-charm-directory: .
+    secrets:
+      charmhub-token: ${{ secrets.CHARMCRAFT_CREDENTIALS }}
     permissions:
       actions: read
       contents: read
@@ -129,17 +194,3 @@ jobs:
       - name: Get operator logs
         run: kubectl logs --tail 100 -ntesting -lapp.kubernetes.io/name=resource-dispatcher -c charm
         if: failure()
-
-  release-pr-preview:
-    name: Release PR preview
-    if: github.event_name == 'pull_request'
-    needs:
-      - build
-    uses: canonical/data-platform-workflows/.github/workflows/release_charm.yaml@v49.0.1
-    with:
-      channel: latest/edge
-      artifact-prefix: ${{ needs.build.outputs.artifact-prefix }}
-      create-github-release: false
-      dry-run: true
-    permissions:
-      contents: write

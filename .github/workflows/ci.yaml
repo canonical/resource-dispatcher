@@ -99,10 +99,23 @@ jobs:
       - lint
       - unit
       - terraform-checks
+    name: Build charm
+    uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@v49.0.1
+    with:
+      cache: true
+    permissions:
+      actions: read
+      contents: read
+
+  build-test-charms:
+    needs:
+      - lib-check
+      - lint
+      - unit
+      - terraform-checks
     strategy:
       matrix:
         charm:
-          - .
           - tests/integration/manifests-tester
           - tests/integration/manifests-tester-no-secret
     name: Build charm | ${{ matrix.charm }}
@@ -151,6 +164,7 @@ jobs:
     runs-on: ubuntu-24.04
     needs:
       - build
+      - build-test-charms
     steps:
       - name: Check out repo
         uses: actions/checkout@v4

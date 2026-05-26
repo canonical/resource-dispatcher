@@ -192,7 +192,7 @@ jobs:
 
       - name: Get juju status
         run: juju status
-        if: failure()
+        if: always()
 
       - name: Get workload logs
         run: kubectl logs --tail 100 -ntesting -lapp.kubernetes.io/name=resource-dispatcher -c resource-dispatcher

@@ -1,0 +1,203 @@
+# Copyright 2025 Canonical Ltd.
+# See LICENSE file for licensing details.
+name: CI
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  pull_request:
+  schedule:
+    - cron: '0 8 * * TUE'
+  # Triggered on push by .github/workflows/release.yaml
+  workflow_call:
+    outputs:
+      artifact-prefix:
+        description: build_charm.yaml `artifact-prefix` output
+        value: ${{ jobs.build.outputs.artifact-prefix }}
+      charm-paths:
+        description: paths for all charms in this repo
+        value: ${{ jobs.get-charm-paths-track.outputs.charm-paths }}
+      track:
+        description: Charmhub track determined from branch name
+        value: ${{ jobs.get-charm-paths-track.outputs.track }}
+
+jobs:
+  get-charm-paths-track:
+    name: Get charm paths and track
+    runs-on: ubuntu-latest
+    outputs:
+      charm-paths: ${{ steps.get-charm-paths.outputs.charm-paths }}
+      track: ${{ steps.determine-track.outputs.track }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Get paths for all charms in this repo
+        id: get-charm-paths
+        uses: canonical/kubeflow-ci/actions/get-charm-paths@main
+      - name: Determine track
+        id: determine-track
+        shell: python
+        run: |
+          import os
+
+          if "${{ github.event_name }}" == "pull_request":
+              ref = "${{ github.base_ref }}"
+          else:
+              ref = "${{ github.ref_name }}"
+
+          if ref.startswith("track/"):
+              track = ref.removeprefix("track/")
+          else:
+              track = "latest"
+
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              f.write(f"track={track}\n")
+
+          print(f"Track: {track}")
+
+  lint:
+    name: Lint Check
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+      - name: Install dependencies
+        run: python3 -m pipx install tox
+      - name: Lint code
+        run: tox -e lint
+
+  unit:
+    name: Unit Test
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+      - name: Install dependencies
+        run: python3 -m pipx install tox
+      - name: Run unit tests
+        run: tox -e unit
+
+  terraform-checks:
+    name: Terraform
+    uses: canonical/charmed-kubeflow-workflows/.github/workflows/terraform-checks.yaml@main
+    with:
+      charm-path: .
+      apply: false
+
+  build:
+    needs:
+      - get-charm-paths-track
+      - lint
+      - unit
+      - terraform-checks
+    name: Build charm
+    uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@v49.0.1
+    with:
+      cache: true
+    permissions:
+      actions: read
+      contents: read
+
+  build-test-charms:
+    needs:
+      - lint
+      - unit
+      - terraform-checks
+    strategy:
+      matrix:
+        charm:
+          - tests/integration/manifests-tester
+          - tests/integration/manifests-tester-no-secret
+    name: Build charm | ${{ matrix.charm }}
+    uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@v49.0.1
+    with:
+      path-to-charm-directory: ${{ matrix.charm }}
+      cache: true
+    permissions:
+      actions: read
+      contents: read
+
+  release:
+    name: Release charm to Charmhub branch
+    if: ${{ github.event_name == 'pull_request' }}
+    needs:
+      - get-charm-paths-track
+      - build
+    uses: canonical/data-platform-workflows/.github/workflows/release_charm_pr.yaml@v49.0.1
+    with:
+      track: ${{ needs.get-charm-paths-track.outputs.track }}
+      artifact-prefix: ${{ needs.build.outputs.artifact-prefix }}
+      path-to-charm-directory: .
+    secrets:
+      charmhub-token: ${{ secrets.CHARMCRAFT_CREDENTIALS }}
+    permissions:
+      actions: read
+      contents: read
+
+  integration:
+    strategy:
+      fail-fast: false
+      matrix:
+        tox-env-istio-mode:
+          - integration
+          - integration-ambient
+        tox-env-type:
+          - charm
+          - upgrade-happy-path
+          - upgrade-erronous-path
+        exclude:
+          - tox-env-istio-mode: integration-ambient
+            tox-env-type: upgrade-happy-path
+          - tox-env-istio-mode: integration-ambient
+            tox-env-type: upgrade-erronous-path
+    name: Integration Test (${{ matrix.tox-env-type }} | ${{ matrix.tox-env-istio-mode }})
+    runs-on: ubuntu-24.04
+    needs:
+      - build
+      - build-test-charms
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+      - name: Install dependencies
+        run: pipx install tox
+
+      - name: Setup environment
+        run: |
+          sudo apt-get remove -y docker-ce docker-ce-cli containerd.io
+          sudo rm -rf /run/containerd
+          sudo snap install concierge --classic
+          sudo concierge prepare --trace
+
+      - name: Download packed charm(s)
+        uses: actions/download-artifact@v4
+        with:
+          pattern: ${{ needs.build.outputs.artifact-prefix }}-*
+          merge-multiple: true
+
+      - name: Run integration tests
+        run: |
+          CHARM_PATH_ARGS=""
+          for charm in *.charm; do
+            [ -f "$charm" ] && CHARM_PATH_ARGS="$CHARM_PATH_ARGS --charm-path=$charm"
+          done
+          tox -vve ${{ matrix.tox-env-istio-mode }}-${{ matrix.tox-env-type }} -- $CHARM_PATH_ARGS
+
+      # On failure, capture debugging resources
+      - name: Get all
+        run: kubectl get all -A
+        if: failure()
+
+      - name: Get juju status
+        run: juju status
+        if: always()
+
+      - name: Get workload logs
+        run: kubectl logs --tail 100 -ntesting -lapp.kubernetes.io/name=resource-dispatcher -c resource-dispatcher
+        if: failure()
+
+      - name: Get operator logs
+        run: kubectl logs --tail 100 -ntesting -lapp.kubernetes.io/name=resource-dispatcher -c charm
+        if: failure()

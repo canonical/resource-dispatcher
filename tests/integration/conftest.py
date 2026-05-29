@@ -50,7 +50,7 @@ def pytest_addoption(parser):
 def _find_charm_path(charm_paths: list[str], keyword: str, exclude: str = "") -> Path | None:
     """Find a charm path from --charm-path options matching a keyword."""
     for p in charm_paths:
-        path = Path(p)
+        path = Path(p).resolve()
         if keyword in path.name and (not exclude or exclude not in path.name):
             return path
     return None

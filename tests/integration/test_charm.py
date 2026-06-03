@@ -43,7 +43,25 @@ CONTAINERS_SECURITY_CONTEXT_MAP = generate_container_securitycontext_map(METADAT
 
 TESTER1_SECRET_NAMES = ["mlpipeline-minio-artifact", "seldon-rclone-secret"]
 TESTER2_SECRET_NAMES = ["mlpipeline-minio-artifact2", "seldon-rclone-secret2"]
+<<<<<<< HEAD
 PODDEFAULTS_NAMES = ["access-minio", "mlflow-server-minio"]
+=======
+TESTER3_SECRET_NAMES = ["mlpipeline-minio-artifact3", "seldon-rclone-secret3"]
+TESTER4_SECRET_NAMES = ["mlpipeline-minio-artifact4", "seldon-rclone-secret4"]
+
+TESTER1_PODDEFAULTS_NAMES = ["access-minio", "mlflow-server-minio"]
+TESTER3_PODDEFAULTS_NAMES = ["access-minio-3", "mlflow-server-minio-3"]
+
+TESTER1_ROLE_NAMES = ["test1-role"]
+TESTER2_ROLE_NAMES = ["test2-role"]
+TESTER1_ROLEBINDING_NAMES = ["test1-rolebinding"]
+TESTER2_ROLEBINDING_NAMES = ["test2-rolebinding"]
+
+PROFILE_SCOPED_SECRET1 = MINIO_SECRET_NAME1
+PROFILE_SCOPED_SECRET2 = MINIO_SECRET_NAME3
+PROFILE_AGNOSTIC_SECRET1 = "mlpipeline-minio-artifact2"
+PROFILE_AGNOSTIC_SECRET2 = "mlpipeline-minio-artifact4"
+>>>>>>> 175a621 ([PRA-90] Add feature to filter out manifests that are scoped to a namespace (#159))
 
 PodDefault = create_namespaced_resource("kubeflow.org", "v1alpha1", "PodDefault", "poddefaults")
 
@@ -93,7 +111,45 @@ def test_container_security_context(
     )
 
 
+<<<<<<< HEAD
 def test_build_and_deploy_helper_charms(juju: jubilant.Juju, manifest_tester_charm: Path):
+=======
+@pytest.mark.parametrize(
+    "tester_charm_fixture,tester_charm_name_1,tester_charm_name_2,service_account_name_1,service_account_name_2",
+    [
+        (
+            "manifest_tester_charm",
+            MANIFEST_CHARM_NAME1,
+            MANIFEST_CHARM_NAME2,
+            "default-sa",
+            "default-sa-2",
+        ),
+        (
+            "manifest_tester_no_secret_charm",
+            MANIFEST_CHARM_NO_SECRET_NAME1,
+            MANIFEST_CHARM_NO_SECRET_NAME2,
+            "config-secret-3",
+            "config-secret-4",
+        ),
+    ],
+)
+def test_build_and_deploy_tester_charms(
+    request,
+    juju: jubilant.Juju,
+    tester_charm_fixture: str,
+    tester_charm_name_1: str,
+    tester_charm_name_2: str,
+    service_account_name_1: str,
+    service_account_name_2: str,
+):
+    """Deploy tester charms.
+
+    The parametrized test will first deploy the manifest-tester charm with the new library that supports secrets,
+    and then deploy the manifest-tester-no-secret charm with the old library that does not support secrets.
+    This allows us to test both types of charms in the subsequent tests.
+    """
+    tester_charm = request.getfixturevalue(tester_charm_fixture)
+>>>>>>> 175a621 ([PRA-90] Add feature to filter out manifests that are scoped to a namespace (#159))
     juju.deploy(
         charm=manifest_tester_charm,
         app=MANIFEST_CHARM_NAME1,
@@ -144,7 +200,97 @@ def test_manifests_created_from_both_helpers(
         assert pod_default != None
 
 
+<<<<<<< HEAD
 def test_remove_relation(juju: jubilant.Juju):
+=======
+@pytest.mark.parametrize(
+    "profile_scoped_secret,profile_agnostic_secret",
+    [
+        (PROFILE_SCOPED_SECRET1, PROFILE_AGNOSTIC_SECRET1),
+        (PROFILE_SCOPED_SECRET2, PROFILE_AGNOSTIC_SECRET2),
+    ],
+)
+def test_manifest_namespace_scoping(
+    lightkube_client: lightkube.Client,
+    profile_namespaces: tuple[str, str],
+    profile_scoped_secret: str,
+    profile_agnostic_secret: str,
+) -> None:
+    """Validate pinned manifests apply to one namespace while unpinned manifests apply to all profiles."""
+    primary_namespace, secondary_namespace = profile_namespaces
+
+    time.sleep(
+        30
+    )  # sync can take up to 10 seconds for reconciliation loop to trigger (+ time to create namespaces)
+
+    # pinned manifests are applied only to the namespace explicitly set in metadata.namespace
+    pinned_secret = lightkube_client.get(
+        Secret, profile_scoped_secret, namespace=primary_namespace
+    )
+    assert pinned_secret != None
+
+    # logger.error("sleeping...")
+    # time.sleep(10 * 60)
+
+    with pytest.raises(ApiError) as e_info:
+        lightkube_client.get(Secret, profile_scoped_secret, namespace=secondary_namespace)
+    assert "not found" in str(e_info)
+
+    # manifests without metadata.namespace are applied to all profile namespaces
+    unpinned_secret_primary = lightkube_client.get(
+        Secret, profile_agnostic_secret, namespace=primary_namespace
+    )
+    unpinned_secret_secondary = lightkube_client.get(
+        Secret, profile_agnostic_secret, namespace=secondary_namespace
+    )
+    assert unpinned_secret_primary != None
+    assert unpinned_secret_secondary != None
+
+
+@pytest.mark.parametrize(
+    (
+        "tester_charm_name,"
+        "expected_deleted_secrets,"
+        "expected_deleted_roles,"
+        "expected_deleted_rolebindings,"
+        "expected_existing_secrets,"
+        "expected_existing_roles,"
+        "expected_existing_rolebindings,"
+    ),
+    [
+        (
+            MANIFEST_CHARM_NAME2,
+            TESTER2_SECRET_NAMES,
+            TESTER2_ROLE_NAMES,
+            TESTER2_ROLEBINDING_NAMES,
+            TESTER1_SECRET_NAMES,
+            TESTER1_ROLE_NAMES,
+            TESTER1_ROLEBINDING_NAMES,
+        ),
+        (
+            MANIFEST_CHARM_NO_SECRET_NAME2,
+            TESTER4_SECRET_NAMES,
+            [],
+            [],
+            TESTER3_SECRET_NAMES,
+            [],
+            [],
+        ),
+    ],
+)
+def test_remove_one_tester_relation(
+    juju: jubilant.Juju,
+    lightkube_client: lightkube.Client,
+    namespace: str,
+    tester_charm_name,
+    expected_deleted_secrets,
+    expected_deleted_roles,
+    expected_deleted_rolebindings,
+    expected_existing_secrets,
+    expected_existing_roles,
+    expected_existing_rolebindings,
+):
+>>>>>>> 175a621 ([PRA-90] Add feature to filter out manifests that are scoped to a namespace (#159))
     """Make sure that charm goes to active state after relation is removed"""
     juju.remove_relation(f"{CHARM_NAME}:secrets", f"{MANIFEST_CHARM_NAME1}:secrets")
     juju.wait(

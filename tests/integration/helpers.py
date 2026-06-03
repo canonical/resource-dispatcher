@@ -14,6 +14,13 @@ logger = logging.getLogger(__name__)
 
 
 RESOURCE_DISPATCHER_CHARM_NAME = "resource-dispatcher"
+<<<<<<< HEAD
+=======
+RESOURCE_DISPATCHER_NO_SECRET_REVISION = (
+    402  # Revision that still uses kubernetes_manifests lib 0.1
+)
+RESOURCE_DISPATCHER_NO_SECRET_OCI_IMAGE = "charmedkubeflow/resource-dispatcher:1.0-22.04"  # Image before feature for roles and rolebindings were added
+>>>>>>> 175a621 ([PRA-90] Add feature to filter out manifests that are scoped to a namespace (#159))
 
 
 def safe_load_file_to_text(filename: str) -> str:

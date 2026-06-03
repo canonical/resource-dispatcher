@@ -43,6 +43,9 @@ CONTAINERS_SECURITY_CONTEXT_MAP = generate_container_securitycontext_map(METADAT
 
 TESTER1_SECRET_NAMES = ["mlpipeline-minio-artifact", "seldon-rclone-secret"]
 TESTER2_SECRET_NAMES = ["mlpipeline-minio-artifact2", "seldon-rclone-secret2"]
+<<<<<<< HEAD
+PODDEFAULTS_NAMES = ["access-minio", "mlflow-server-minio"]
+=======
 TESTER3_SECRET_NAMES = ["mlpipeline-minio-artifact3", "seldon-rclone-secret3"]
 TESTER4_SECRET_NAMES = ["mlpipeline-minio-artifact4", "seldon-rclone-secret4"]
 
@@ -58,6 +61,7 @@ PROFILE_SCOPED_SECRET1 = MINIO_SECRET_NAME1
 PROFILE_SCOPED_SECRET2 = MINIO_SECRET_NAME3
 PROFILE_AGNOSTIC_SECRET1 = "mlpipeline-minio-artifact2"
 PROFILE_AGNOSTIC_SECRET2 = "mlpipeline-minio-artifact4"
+>>>>>>> 175a621 ([PRA-90] Add feature to filter out manifests that are scoped to a namespace (#159))
 
 PodDefault = create_namespaced_resource("kubeflow.org", "v1alpha1", "PodDefault", "poddefaults")
 
@@ -107,6 +111,9 @@ def test_container_security_context(
     )
 
 
+<<<<<<< HEAD
+def test_build_and_deploy_helper_charms(juju: jubilant.Juju, manifest_tester_charm: Path):
+=======
 @pytest.mark.parametrize(
     "tester_charm_fixture,tester_charm_name_1,tester_charm_name_2,service_account_name_1,service_account_name_2",
     [
@@ -142,6 +149,7 @@ def test_build_and_deploy_tester_charms(
     This allows us to test both types of charms in the subsequent tests.
     """
     tester_charm = request.getfixturevalue(tester_charm_fixture)
+>>>>>>> 175a621 ([PRA-90] Add feature to filter out manifests that are scoped to a namespace (#159))
     juju.deploy(
         charm=manifest_tester_charm,
         app=MANIFEST_CHARM_NAME1,
@@ -192,6 +200,9 @@ def test_manifests_created_from_both_helpers(
         assert pod_default != None
 
 
+<<<<<<< HEAD
+def test_remove_relation(juju: jubilant.Juju):
+=======
 @pytest.mark.parametrize(
     "profile_scoped_secret,profile_agnostic_secret",
     [
@@ -279,6 +290,7 @@ def test_remove_one_tester_relation(
     expected_existing_roles,
     expected_existing_rolebindings,
 ):
+>>>>>>> 175a621 ([PRA-90] Add feature to filter out manifests that are scoped to a namespace (#159))
     """Make sure that charm goes to active state after relation is removed"""
     juju.remove_relation(f"{CHARM_NAME}:secrets", f"{MANIFEST_CHARM_NAME1}:secrets")
     juju.wait(

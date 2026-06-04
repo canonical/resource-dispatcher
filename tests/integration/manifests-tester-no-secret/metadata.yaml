@@ -12,7 +12,3 @@ requires:
     interface: kubernetes_manifest
   pod-defaults:
     interface: kubernetes_manifest
-  roles:
-    interface: kubernetes_manifest
-  role-bindings:
-    interface: kubernetes_manifest

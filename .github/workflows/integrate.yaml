@@ -9,20 +9,6 @@ on:
 
 jobs:
 
-  lib-check:
-    name: Check libraries
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Check libs
-        uses: canonical/charming-actions/check-libraries@2.3.0
-        with:
-          credentials: "${{ secrets.charmcraft-credentials }}"
-          github-token: "${{ secrets.GITHUB_TOKEN }}"
-
   lint:
     name: Lint Check
     runs-on: ubuntu-24.04
@@ -61,10 +47,43 @@ jobs:
       # See: https://github.com/canonical/resource-dispatcher/issues/66
       apply: false
 
-  integration:
-    name: Integration Test (build and deploy)
-    runs-on: ubuntu-24.04
+  build:
+    needs:
+      - lint
+      - unit
+      - terraform-checks
+    strategy:
+      matrix:
+        path:
+          - .
+          - tests/integration/manifests-tester
+          - tests/integration/manifests-tester-no-secret
+    name: Build charm | ${{ matrix.path }}
+    uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@v41.1.0
+    with:
+      path-to-charm-directory: ${{ matrix.path }}
+      cache: false
 
+  integration:
+    strategy:
+      fail-fast: false
+      matrix:
+        tox-env-istio-mode:
+          - integration
+          - integration-ambient
+        tox-env-type:
+          - charm
+          - upgrade-happy-path
+          - upgrade-erronous-path
+        exclude:
+          - tox-env-istio-mode: integration-ambient
+            tox-env-type: upgrade-happy-path
+          - tox-env-istio-mode: integration-ambient
+            tox-env-type: upgrade-erronous-path
+    name: Integration Test (${{ matrix.tox-env-type }} | ${{ matrix.tox-env-istio-mode }})
+    runs-on: ubuntu-24.04
+    needs:
+      - build
     steps:
     - name: Check out repo
       uses: actions/checkout@v4
@@ -78,8 +97,14 @@ jobs:
         sudo snap install concierge --classic
         sudo concierge prepare --trace
 
+    - name: Download packed charm(s)
+      uses: actions/download-artifact@v7
+      with:
+        pattern: ${{ needs.build.outputs.artifact-prefix }}-*
+        merge-multiple: true
+        
     - name: Run integration tests
-      run: tox -vve integration
+      run: tox -vve ${{ matrix.tox-env-istio-mode }}-${{ matrix.tox-env-type }}
 
     # On failure, capture debugging resources
     - name: Get all
@@ -91,9 +116,9 @@ jobs:
       if: failure()
 
     - name: Get workload logs
-      run: kubectl logs --tail 100 -ntesting -lapp.kubernetes.io/name=resource-dispatcher
+      run: kubectl logs --tail 100 -ntesting -lapp.kubernetes.io/name=resource-dispatcher -c resource-dispatcher
       if: failure()
 
     - name: Get operator logs
-      run: kubectl logs --tail 100 -ntesting -loperator.juju.is/name=resource-dispatcher
+      run: kubectl logs --tail 100 -ntesting -lapp.kubernetes.io/name=resource-dispatcher -c charm
       if: failure()

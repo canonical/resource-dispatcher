@@ -1,32 +1,13 @@
 name: On Pull Request
 
 # On pull_request, we:
-<<<<<<< HEAD
-# * always publish to charmhub at latest/edge/branchname
-# * always run tests
-=======
 # * create backport labels if it is against main, only when the PR is opened/reopened
->>>>>>> 989df41 (chore: Update CI to use charmcraftcache (#163))
 
 on:
   pull_request:
 
 jobs:
 
-<<<<<<< HEAD
-  tests:
-    name: Run Tests
-    uses: ./.github/workflows/integrate.yaml
-    secrets:
-      charmcraft-credentials: ${{ secrets.CHARMCRAFT_CREDENTIALS }}
-
-  # publish runs in parallel with tests, as we always publish in this situation
-  publish-charm:
-    name: Publish Charm
-    uses: ./.github/workflows/publish.yaml
-    secrets:
-      CHARMCRAFT_CREDENTIALS: ${{ secrets.CHARMCRAFT_CREDENTIALS }}
-=======
   populate-labels:
     name: Populate labels
     if: github.base_ref == 'main' && (github.event.action == 'opened' || github.event.action == 'reopened')
@@ -35,5 +16,3 @@ jobs:
     with:
       track_file_path: ".github/automatic_backport_tracks.yaml"
       label_prefix: "backport "
-
->>>>>>> 989df41 (chore: Update CI to use charmcraftcache (#163))

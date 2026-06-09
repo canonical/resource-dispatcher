@@ -13,6 +13,7 @@ import lightkube
 import pytest
 import yaml
 from lightkube import codecs
+from lightkube.resources.core_v1 import Namespace
 
 from .helpers import delete_all_from_yaml, get_or_build_charm, safe_load_file_to_text
 
@@ -26,8 +27,9 @@ MANIFESTS_TESTER_NO_SECRET_CHARM_PATH = Path(
     "tests/integration/manifests-tester-no-secret"
 ).absolute()
 
-NAMESPACE_MANIFEST_FILE = "./tests/integration/namespace.yaml"
+NAMESPACE_MANIFEST_FILE = "./tests/integration/resources/namespace.yaml"
 TESTING_LABELS = ["user.kubeflow.org/enabled"]  # Might be more than one in the future
+SECONDARY_TEST_NAMESPACE = "test-namespace-resource-dispatcher-2"
 
 
 def pytest_addoption(parser):
@@ -37,11 +39,29 @@ def pytest_addoption(parser):
         default=False,
         help="keep temporarily-created models",
     )
+    parser.addoption(
+        "--charm-path",
+        action="append",
+        default=[],
+        help="Path to a pre-built charm file (can be repeated)",
+    )
+
+
+def _find_charm_path(charm_paths: list[str], keyword: str, exclude: str = "") -> Path | None:
+    """Find a charm path from --charm-path options matching a keyword."""
+    for p in charm_paths:
+        path = Path(p).resolve()
+        if keyword in path.name and (not exclude or exclude not in path.name):
+            return path
+    return None
 
 
 @pytest.fixture(scope="module")
-def resource_dispatcher_charm() -> Path:
+def resource_dispatcher_charm(request) -> Path:
     """Path to the packed resource-dispatcher charm."""
+    charm_paths = request.config.getoption("--charm-path")
+    if path := _find_charm_path(charm_paths, "resource-dispatcher", exclude="manifests-tester"):
+        return path
     return get_or_build_charm(
         Path.cwd(),
         name="resource-dispatcher",
@@ -49,11 +69,26 @@ def resource_dispatcher_charm() -> Path:
 
 
 @pytest.fixture(scope="module")
-def manifest_tester_charm() -> Path:
+def manifest_tester_charm(request) -> Path:
     """Path to the packed manifest-tester charm with new lib that supports secrets."""
+    charm_paths = request.config.getoption("--charm-path")
+    if path := _find_charm_path(charm_paths, "manifests-tester", exclude="no-secret"):
+        return path
     return get_or_build_charm(
         Path.cwd() / "tests/integration/manifests-tester",
         name="manifest-tester",
+    )
+
+
+@pytest.fixture(scope="module")
+def manifest_tester_no_secret_charm(request) -> Path:
+    """Path to the packed manifest-tester charm with old lib that does not support secrets."""
+    charm_paths = request.config.getoption("--charm-path")
+    if path := _find_charm_path(charm_paths, "no-secret"):
+        return path
+    return get_or_build_charm(
+        Path.cwd() / "tests/integration/manifests-tester-no-secret",
+        name="manifest-tester-no-secret",
     )
 
 
@@ -71,7 +106,7 @@ def lightkube_client() -> lightkube.Client:
     return client
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="module")
 def namespace(lightkube_client: lightkube.Client):
     yaml_text = safe_load_file_to_text(NAMESPACE_MANIFEST_FILE)
     yaml_rendered = yaml.safe_load(yaml_text)
@@ -83,6 +118,26 @@ def namespace(lightkube_client: lightkube.Client):
     yield obj.metadata.name
 
     delete_all_from_yaml(yaml_text, lightkube_client)
+
+
+@pytest.fixture(scope="module")
+def secondary_namespace(lightkube_client: lightkube.Client):
+    yaml_text = safe_load_file_to_text(NAMESPACE_MANIFEST_FILE)
+    namespace = yaml.safe_load(yaml_text)
+    namespace["metadata"]["name"] = SECONDARY_TEST_NAMESPACE
+    for label in TESTING_LABELS:
+        namespace["metadata"]["labels"][label] = "true"
+    obj = codecs.from_dict(namespace)
+    lightkube_client.apply(obj)
+
+    yield obj.metadata.name
+
+    delete_all_from_yaml(yaml.safe_dump(namespace), lightkube_client)
+
+
+@pytest.fixture(scope="module")
+def profile_namespaces(namespace: str, secondary_namespace: str) -> tuple[str, str]:
+    return (namespace, secondary_namespace)
 
 
 @pytest.fixture(scope="module")

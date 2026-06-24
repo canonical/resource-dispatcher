@@ -5,11 +5,13 @@
 
 import logging
 
+import tenacity
 import yaml
 from charmed_kubeflow_chisme.exceptions import ErrorWithStatus, GenericCharmRuntimeError
 from charmed_kubeflow_chisme.kubernetes import KubernetesResourceHandler
 from charmed_kubeflow_chisme.lightkube.batch import delete_many
 from charmed_kubeflow_chisme.service_mesh import generate_allow_all_authorization_policy
+from charmed_kubeflow_chisme.types import LightkubeResourcesList
 from charms.istio_beacon_k8s.v0.service_mesh import (
     MeshType,
     PolicyResourceManager,
@@ -35,6 +37,14 @@ SERVICE_MESH_RELATION_NAME = "service-mesh"
 ROLES_RELATION_NAME = "roles"
 ROLEBINDINGS_RELATION_NAME = "role-bindings"
 CONFIGMAPS_RELATION_NAME = "config-maps"
+
+
+# For errors when a K8s object exists while it shouldn't
+class ObjectStillExistsError(Exception):
+    """Exception for when a K8s object exists, while it should have been removed."""
+
+    def __init__(self, resource_name: str):
+        self.resource_name = resource_name
 
 
 class ResourceDispatcherOperator(CharmBase):
@@ -384,6 +394,33 @@ class ResourceDispatcherOperator(CharmBase):
 
         self.model.unit.status = ActiveStatus()
 
+    @tenacity.retry(stop=tenacity.stop_after_delay(300), wait=tenacity.wait_fixed(5), reraise=True)
+    def ensure_resource_is_deleted(self, client: Client, resource_kind, resource_name: str):
+        """Check if the CRD doesn't exist with retries.
+
+        The function will keep retrying until the CRD is deleted, and handle the
+        404 error once it gets deleted.
+
+        Args:
+            crd_name: The CRD to be checked if it is deleted.
+            client: The lightkube client to use for talking to K8s.
+
+        Raises:
+            ApiError: From lightkube, if there was an error aside from 404.
+            ObjectStillExistsError: If the Profile's namespace was not deleted after retries.
+        """
+        self.logger.info(f"Checking if resource exists: {resource_name}")
+        try:
+            client.get(resource_kind, name=resource_name)
+            self.logger.info(f"Resource `{resource_name}` exists, retrying...")
+            raise ObjectStillExistsError(resource_name)
+        except ApiError as e:
+            if e.status.code == 404:
+                self.logger.info(f"Resource `{resource_name}` does not exist")
+                return
+            # Raise any other error
+            raise
+
     def _on_remove(self, _):
         """Remove all resources."""
         self._check_leader()
@@ -402,7 +439,39 @@ class ResourceDispatcherOperator(CharmBase):
             if err.status.code != 404:
                 self.logger.error(f"Failed to delete K8S resources, with error: {err}")
                 raise err
+        for resource_name, resource_kind in _extract_runtimes_names(
+            k8s_resources_manifests
+        ).items():
+            try:
+                self.ensure_resource_is_deleted(
+                    client=self.k8s_resource_handler.lightkube_client,
+                    resource_kind=resource_kind,
+                    resource_name=resource_name,
+                )
+            except ObjectStillExistsError as e:
+                self.logger.warning(
+                    f"Failed to remove resource: {e.resource_name}. "
+                    "Manual intervention for cleanup might be required"
+                )
+                raise e
         self.unit.status = MaintenanceStatus("K8S resources removed")
+
+
+def _extract_runtimes_names(manifests: LightkubeResourcesList) -> dict:
+    """
+    Extracts a mapping of runtime resource names to their kinds.
+
+    Args:
+        manifests (LightkubeResourcesList): List of runtime manifest objects,
+        each with metadata and kind.
+
+    Returns:
+        dict: Dictionary mapping resource names (str) to their kind.
+    """
+    runtimes_kind_name_mapping = {}
+    for runtime in manifests:
+        runtimes_kind_name_mapping.update({runtime.metadata.name: runtime.__class__})
+    return runtimes_kind_name_mapping
 
 
 if __name__ == "__main__":  # pragma: nocover

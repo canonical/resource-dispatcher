@@ -6,6 +6,7 @@
 import contextlib
 import logging
 import shutil
+import sys
 from pathlib import Path
 
 import jubilant
@@ -13,7 +14,6 @@ import lightkube
 import pytest
 import yaml
 from lightkube import codecs
-from lightkube.resources.core_v1 import Namespace
 
 from .helpers import delete_all_from_yaml, get_or_build_charm, safe_load_file_to_text
 
@@ -159,5 +159,5 @@ def juju(request: pytest.FixtureRequest):
         if request.session.testsfailed:
             debug_log = juju.debug_log(limit=1000)
             status = juju.cli("status")
-            logger.info(debug_log)
-            logger.info(status)
+            print(debug_log, end="", file=sys.stderr)
+            print(status, end="", file=sys.stderr)

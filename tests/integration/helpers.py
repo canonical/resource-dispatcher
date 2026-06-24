@@ -10,7 +10,7 @@ from charmed_kubeflow_chisme.kubernetes import KubernetesResourceHandler
 from lightkube import codecs
 from lightkube.core.exceptions import ApiError
 from lightkube.generic_resource import GenericNamespacedResource, load_in_cluster_generic_resources
-from tenacity import retry, retry_if_exception_type, stop_after_delay, wait_exponential
+from tenacity import retry, stop_after_delay, wait_exponential
 
 logger = logging.getLogger(__name__)
 
@@ -72,57 +72,37 @@ def get_or_build_charm(charm_path: Path, name: str) -> Path:
     stop=stop_after_delay(60),
     reraise=True,
 )
-def assert_resource_exists(
+def assert_resource_status(
     lightkube_client: lightkube.Client,
     resource_type: GenericNamespacedResource,
     name: str,
     namespace: str,
+    exists: bool = True,
 ):
-    """Assert a Kubernetes resource exists, raising a clear error if it does not.
+    """Assert whether a Kubernetes resource exists, raising a clear error otherwise.
 
-    lightkube's ``get`` raises an ``ApiError`` when the resource is missing, so this
-    helper converts a 404 into an explicit ``AssertionError`` with a useful message
-    and returns the fetched object for further assertions. The check is retried with
-    exponential backoff (capped at 10s per wait) for up to 60s to allow for the
-    reconciliation loop to converge.
+    When ``exists`` is ``True`` (the default), assert the resource is present and
+    return the fetched object for further assertions. When ``exists`` is ``False``,
+    assert the resource is absent. lightkube's ``get`` raises an ``ApiError`` with a
+    404 status when the resource is missing, which this helper translates into an
+    explicit ``AssertionError`` with a useful message depending on the expectation.
+    The check is retried with exponential backoff (capped at 10s per wait) for up to
+    60s to allow for the reconciliation loop to converge.
     """
     try:
-        return lightkube_client.get(resource_type, name, namespace=namespace)
+        obj = lightkube_client.get(resource_type, name, namespace=namespace)
     except ApiError as e:
         if e.status.code == 404:
-            raise AssertionError(
-                f"Expected {resource_type.__name__} '{name}' to exist in namespace "
-                f"'{namespace}', but it was not found."
-            ) from e
-        raise
-
-
-@retry(
-    wait=wait_exponential(max=10),
-    stop=stop_after_delay(60),
-    reraise=True,
-)
-def assert_resource_does_not_exist(
-    lightkube_client: lightkube.Client,
-    resource_type: GenericNamespacedResource,
-    name: str,
-    namespace: str,
-):
-    """Assert a Kubernetes resource does not exist, raising a clear error if it does.
-
-    lightkube's ``get`` raises an ``ApiError`` with a 404 status when the resource is
-    missing, which is the expected outcome here. Any other result (the resource being
-    returned, or a non-404 error) is surfaced as a failure. The check is retried with
-    exponential backoff (capped at 10s per wait) for up to 60s to allow for the
-    reconciliation loop to converge.
-    """
-    try:
-        lightkube_client.get(resource_type, name, namespace=namespace)
-    except ApiError as e:
-        if e.status.code == 404:
+            if exists:
+                raise AssertionError(
+                    f"Expected {resource_type.__name__} '{name}' to exist in namespace "
+                    f"'{namespace}'"
+                ) from e
             return
         raise
-    raise AssertionError(
-        f"Expected {resource_type.__name__} '{name}' to be absent from namespace "
-        f"'{namespace}', but it still exists."
-    )
+    if not exists:
+        raise AssertionError(
+            f"Expected {resource_type.__name__} '{name}' to be absent from namespace "
+            f"'{namespace}'"
+        )
+    return obj

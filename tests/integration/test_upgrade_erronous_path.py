@@ -28,8 +28,7 @@ from .helpers import (
     RESOURCE_DISPATCHER_CHARM_NAME,
     RESOURCE_DISPATCHER_NO_SECRET_OCI_IMAGE,
     RESOURCE_DISPATCHER_NO_SECRET_REVISION,
-    assert_resource_does_not_exist,
-    assert_resource_exists,
+    assert_resource_status,
     deploy_k8s_resources,
 )
 
@@ -147,8 +146,8 @@ def test_manifests_created_from_tester_charm_old(
     time.sleep(
         30
     )  # sync can take up to 10 seconds for reconciliation loop to trigger (+ time to create namespace)
-    assert_resource_exists(lightkube_client, ServiceAccount, SERVICE_ACCOUNT_NAME, namespace)
-    secret = assert_resource_exists(lightkube_client, Secret, MINIO_SECRET_NAME_OLD, namespace)
+    assert_resource_status(lightkube_client, ServiceAccount, SERVICE_ACCOUNT_NAME, namespace)
+    secret = assert_resource_status(lightkube_client, Secret, MINIO_SECRET_NAME_OLD, namespace)
     # Testing one secret for content
     assert secret.data == {
         "AWS_ACCESS_KEY_ID": base64.b64encode("access_key".encode("utf-8")).decode("utf-8"),
@@ -157,9 +156,9 @@ def test_manifests_created_from_tester_charm_old(
         ),
     }
     for name in TESTER_SECRET_NAMES_OLD:
-        assert_resource_exists(lightkube_client, Secret, name, namespace)
+        assert_resource_status(lightkube_client, Secret, name, namespace)
     for name in TESTER_PODDEFAULTS_NAMES_OLD:
-        assert_resource_exists(lightkube_client, PodDefault, name, namespace)
+        assert_resource_status(lightkube_client, PodDefault, name, namespace)
 
 
 def test_upgrade_tester_charm(juju: jubilant.Juju, manifest_tester_charm: Path):
@@ -213,7 +212,7 @@ def test_integrate_new_relations_with_resource_dispatcher(
         f"{RESOURCE_DISPATCHER_CHARM_NAME}:role-bindings", f"{MANIFEST_TESTER_CHARM}:role-bindings"
     )
     juju.integrate(
-        f"{RESOURCE_DISPATCHER_CHARM_NAME}:configmaps", f"{MANIFEST_TESTER_CHARM}:configmaps"
+        f"{RESOURCE_DISPATCHER_CHARM_NAME}:config-maps", f"{MANIFEST_TESTER_CHARM}:config-maps"
     )
     status = juju.wait(
         lambda status: jubilant.all_active(status) and jubilant.all_agents_idle(status), delay=5
@@ -228,11 +227,11 @@ def test_integrate_new_relations_with_resource_dispatcher(
         30
     )  # sync can take up to 10 seconds for reconciliation loop to trigger (+ time to create namespace)
     for name in TESTER_ROLE_NAMES:
-        assert_resource_exists(lightkube_client, Role, name, namespace)
+        assert_resource_status(lightkube_client, Role, name, namespace)
     for name in TESTER_ROLEBINDING_NAMES:
-        assert_resource_exists(lightkube_client, RoleBinding, name, namespace)
+        assert_resource_status(lightkube_client, RoleBinding, name, namespace)
     for name in TESTER_CONFIGMAPS_NAMES:
-        assert_resource_exists(lightkube_client, ConfigMap, name, namespace)
+        assert_resource_status(lightkube_client, ConfigMap, name, namespace)
 
 
 def test_change_in_manifest_reflected_again(
@@ -245,10 +244,10 @@ def test_change_in_manifest_reflected_again(
     juju.wait(
         lambda status: jubilant.all_active(status) and jubilant.all_agents_idle(status), delay=10
     )
-    assert_resource_does_not_exist(
-        lightkube_client, ServiceAccount, SERVICE_ACCOUNT_NAME, namespace
+    assert_resource_status(
+        lightkube_client, ServiceAccount, SERVICE_ACCOUNT_NAME, namespace, exists=False
     )
-    assert_resource_exists(lightkube_client, ServiceAccount, SERVICE_ACCOUNT_NAME_2, namespace)
+    assert_resource_status(lightkube_client, ServiceAccount, SERVICE_ACCOUNT_NAME_2, namespace)
 
 
 def test_profile_scoped_secrets(
@@ -257,7 +256,7 @@ def test_profile_scoped_secrets(
     """Test that profile scoped secret (mlpipeline-minio-artifact) created previously by resource-dispatcher are removed."""
     primary_profile, secondary_profile = profile_namespaces
     for name in TESTER_SECRET_NAMES_NEW:
-        assert_resource_exists(lightkube_client, Secret, name, primary_profile)
-    assert_resource_does_not_exist(
-        lightkube_client, Secret, PROFILE_SCOPED_SECRET, secondary_profile
+        assert_resource_status(lightkube_client, Secret, name, primary_profile)
+    assert_resource_status(
+        lightkube_client, Secret, PROFILE_SCOPED_SECRET, secondary_profile, exists=False
     )

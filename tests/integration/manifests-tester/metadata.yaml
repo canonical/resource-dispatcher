@@ -6,7 +6,7 @@ summary: |
 description: |
   Charm for sending manifests to ResourceDispatcher relations.
 requires:
-  configmaps:
+  config-maps:
     interface: kubernetes_manifest
   secrets:
     interface: kubernetes_manifest

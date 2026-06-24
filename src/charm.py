@@ -34,7 +34,7 @@ SERVICEACCOUNTS_RELATION_NAME = "service-accounts"
 SERVICE_MESH_RELATION_NAME = "service-mesh"
 ROLES_RELATION_NAME = "roles"
 ROLEBINDINGS_RELATION_NAME = "role-bindings"
-CONFIGMAPS_RELATION_NAME = "configmaps"
+CONFIGMAPS_RELATION_NAME = "config-maps"
 
 
 class ResourceDispatcherOperator(CharmBase):

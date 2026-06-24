@@ -20,7 +20,7 @@ from ops.model import ActiveStatus
 
 logger = logging.getLogger(__name__)
 
-CONFIGMAPS_RELATION_NAME = "configmaps"
+CONFIGMAPS_RELATION_NAME = "config-maps"
 PODDEFAULTS_RELATION_NAME = "pod-defaults"
 SECRETS_RELATION_NAME = "secrets"
 SERVICEACCOUNTS_RELATION_NAME = "service-accounts"

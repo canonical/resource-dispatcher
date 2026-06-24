@@ -16,12 +16,7 @@ from lightkube.resources.core_v1 import ConfigMap, Secret, ServiceAccount
 from lightkube.resources.rbac_authorization_v1 import Role, RoleBinding
 
 from .charms_dependencies import ISTIO_BEACON_K8S, ISTIO_K8S, METACONTROLLER_OPERATOR
-from .helpers import (
-    RESOURCE_DISPATCHER_CHARM_NAME,
-    assert_resource_does_not_exist,
-    assert_resource_exists,
-    deploy_k8s_resources,
-)
+from .helpers import RESOURCE_DISPATCHER_CHARM_NAME, assert_resource_status, deploy_k8s_resources
 
 logger = logging.getLogger(__name__)
 
@@ -250,7 +245,7 @@ def test_integrate_tester_with_resource_dispatcher(
             f"{tester1_charm_name}:role-bindings",
         )
         juju.integrate(
-            f"{RESOURCE_DISPATCHER_CHARM_NAME}:configmaps", f"{tester1_charm_name}:configmaps"
+            f"{RESOURCE_DISPATCHER_CHARM_NAME}:config-maps", f"{tester1_charm_name}:config-maps"
         )
 
     # role-bindings relation support is only added recently -- they don't exist on old charms
@@ -261,7 +256,7 @@ def test_integrate_tester_with_resource_dispatcher(
             f"{tester2_charm_name}:role-bindings",
         )
         juju.integrate(
-            f"{RESOURCE_DISPATCHER_CHARM_NAME}:configmaps", f"{tester2_charm_name}:configmaps"
+            f"{RESOURCE_DISPATCHER_CHARM_NAME}:config-maps", f"{tester2_charm_name}:config-maps"
         )
 
     status = juju.wait(
@@ -333,11 +328,11 @@ def test_manifests_created_from_both_tester_charms(
     expected_tester_configmaps_1,
     expected_tester_configmaps_2,
 ):
-    assert_resource_exists(
+    assert_resource_status(
         lightkube_client, ServiceAccount, expected_service_account_name, namespace
     )
     # Testing one secret for content
-    secret = assert_resource_exists(
+    secret = assert_resource_status(
         lightkube_client, Secret, expected_minio_secret_name, namespace
     )
     assert secret.data == {
@@ -347,15 +342,15 @@ def test_manifests_created_from_both_tester_charms(
         ),
     }
     for name in expected_tester_secrets_1 + expected_tester_secrets_2:
-        assert_resource_exists(lightkube_client, Secret, name, namespace)
+        assert_resource_status(lightkube_client, Secret, name, namespace)
     for name in expected_pod_defaults:
-        assert_resource_exists(lightkube_client, PodDefault, name, namespace)
+        assert_resource_status(lightkube_client, PodDefault, name, namespace)
     for name in expected_tester_roles_1 + expected_tester_roles_2:
-        assert_resource_exists(lightkube_client, Role, name, namespace)
+        assert_resource_status(lightkube_client, Role, name, namespace)
     for name in expected_tester_rolebindings_1 + expected_tester_rolebindings_2:
-        assert_resource_exists(lightkube_client, RoleBinding, name, namespace)
+        assert_resource_status(lightkube_client, RoleBinding, name, namespace)
     for name in expected_tester_configmaps_1 + expected_tester_configmaps_2:
-        assert_resource_exists(lightkube_client, ConfigMap, name, namespace)
+        assert_resource_status(lightkube_client, ConfigMap, name, namespace)
 
 
 @pytest.mark.parametrize(
@@ -375,14 +370,14 @@ def test_manifest_namespace_scoping(
     primary_namespace, secondary_namespace = profile_namespaces
 
     # pinned manifests are applied only to the namespace explicitly set in metadata.namespace
-    assert_resource_exists(lightkube_client, Secret, profile_scoped_secret, primary_namespace)
-    assert_resource_does_not_exist(
-        lightkube_client, Secret, profile_scoped_secret, secondary_namespace
+    assert_resource_status(lightkube_client, Secret, profile_scoped_secret, primary_namespace)
+    assert_resource_status(
+        lightkube_client, Secret, profile_scoped_secret, secondary_namespace, exists=False
     )
 
     # manifests without metadata.namespace are applied to all profile namespaces
-    assert_resource_exists(lightkube_client, Secret, profile_agnostic_secret, primary_namespace)
-    assert_resource_exists(lightkube_client, Secret, profile_agnostic_secret, secondary_namespace)
+    assert_resource_status(lightkube_client, Secret, profile_agnostic_secret, primary_namespace)
+    assert_resource_status(lightkube_client, Secret, profile_agnostic_secret, secondary_namespace)
 
 
 @pytest.mark.parametrize(
@@ -448,29 +443,29 @@ def test_remove_one_tester_relation(
             f"{RESOURCE_DISPATCHER_CHARM_NAME}:role-bindings", f"{tester_charm_name}:role-bindings"
         )
         juju.remove_relation(
-            f"{RESOURCE_DISPATCHER_CHARM_NAME}:configmaps", f"{tester_charm_name}:configmaps"
+            f"{RESOURCE_DISPATCHER_CHARM_NAME}:config-maps", f"{tester_charm_name}:config-maps"
         )
 
     juju.wait(
         lambda status: jubilant.all_active(status) and jubilant.all_agents_idle(status), delay=10
     )
     for name in expected_deleted_secrets:
-        assert_resource_does_not_exist(lightkube_client, Secret, name, namespace)
+        assert_resource_status(lightkube_client, Secret, name, namespace, exists=False)
     for name in expected_deleted_roles:
-        assert_resource_does_not_exist(lightkube_client, Role, name, namespace)
+        assert_resource_status(lightkube_client, Role, name, namespace, exists=False)
     for name in expected_deleted_rolebindings:
-        assert_resource_does_not_exist(lightkube_client, RoleBinding, name, namespace)
+        assert_resource_status(lightkube_client, RoleBinding, name, namespace, exists=False)
     for name in expected_deleted_configmaps:
-        assert_resource_does_not_exist(lightkube_client, ConfigMap, name, namespace)
+        assert_resource_status(lightkube_client, ConfigMap, name, namespace, exists=False)
 
     for name in expected_existing_secrets:
-        assert_resource_exists(lightkube_client, Secret, name, namespace)
+        assert_resource_status(lightkube_client, Secret, name, namespace)
     for name in expected_existing_roles:
-        assert_resource_exists(lightkube_client, Role, name, namespace)
+        assert_resource_status(lightkube_client, Role, name, namespace)
     for name in expected_existing_rolebindings:
-        assert_resource_exists(lightkube_client, RoleBinding, name, namespace)
+        assert_resource_status(lightkube_client, RoleBinding, name, namespace)
     for name in expected_existing_configmaps:
-        assert_resource_exists(lightkube_client, ConfigMap, name, namespace)
+        assert_resource_status(lightkube_client, ConfigMap, name, namespace)
 
 
 @pytest.mark.parametrize(
@@ -493,7 +488,7 @@ def test_change_in_manifest_reflected(
     juju.wait(
         lambda status: jubilant.all_active(status) and jubilant.all_agents_idle(status), delay=10
     )
-    assert_resource_does_not_exist(
-        lightkube_client, ServiceAccount, old_service_account, namespace
+    assert_resource_status(
+        lightkube_client, ServiceAccount, old_service_account, namespace, exists=False
     )
-    assert_resource_exists(lightkube_client, ServiceAccount, new_service_account, namespace)
+    assert_resource_status(lightkube_client, ServiceAccount, new_service_account, namespace)

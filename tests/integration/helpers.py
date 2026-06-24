@@ -10,7 +10,7 @@ from charmed_kubeflow_chisme.kubernetes import KubernetesResourceHandler
 from lightkube import codecs
 from lightkube.core.exceptions import ApiError
 from lightkube.generic_resource import GenericNamespacedResource, load_in_cluster_generic_resources
-from tenacity import retry, stop_after_delay, wait_exponential
+from tenacity import retry, retry_if_exception_type, stop_after_delay, wait_exponential
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +68,7 @@ def get_or_build_charm(charm_path: Path, name: str) -> Path:
 
 
 @retry(
+    retry=retry_if_exception_type(AssertionError),
     wait=wait_exponential(max=10),
     stop=stop_after_delay(60),
     reraise=True,

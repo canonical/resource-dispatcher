@@ -17,7 +17,7 @@ resources:
   oci-image:
     type: oci-image
     description: Backing OCI image
-    upstream-source: docker.io/charmedkubeflow/resource-dispatcher:3.2-4fb4dfa
+    upstream-source: docker.io/charmedkubeflow/resource-dispatcher:3.3-f3d609a-20260625162501
 provides:
   provide-cmr-mesh:
     interface: cross_model_mesh

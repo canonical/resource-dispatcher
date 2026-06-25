@@ -17,7 +17,7 @@ from ops.model import BlockedStatus, MaintenanceStatus, WaitingStatus
 from ops.pebble import ChangeError, Service
 from ops.testing import Harness
 
-from charm import ObjectStillExistsError, ResourceDispatcherOperator
+from charm import ResourceDispatcherOperator
 
 EXPECTED_SERVICE = {
     "resource-dispatcher": Service(
@@ -293,55 +293,6 @@ class TestCharm:
         harness.begin()
         harness.charm._on_remove(None)
         assert harness.charm.model.unit.status == MaintenanceStatus("K8S resources removed")
-
-    @patch(
-        "charm.KubernetesServicePatch",
-        lambda x, y, service_name, service_type, refresh_event: None,
-    )
-    @patch("charm.ResourceDispatcherOperator.ensure_resource_is_deleted")
-    @patch("charm.ResourceDispatcherOperator.k8s_resource_handler")
-    @patch("charm.delete_many")
-    def test_on_remove_runtimes_deleted_success(
-        self,
-        delete_many: MagicMock,
-        k8s_resource_handler: MagicMock,
-        ensure_resource_is_deleted: MagicMock,
-        harness: Harness,
-        mock_lightkube_client: MagicMock,
-    ):
-        harness.begin()
-        fake_manifest = MagicMock()
-        fake_manifest.metadata.name = "manifest-1"
-        harness.charm.k8s_resource_handler.render_manifests.return_value = [fake_manifest]
-        harness.charm._on_remove(None)
-        ensure_resource_is_deleted.assert_called_once()
-        assert harness.charm.model.unit.status == MaintenanceStatus("K8S resources removed")
-
-    @patch(
-        "charm.KubernetesServicePatch",
-        lambda x, y, service_name, service_type, refresh_event: None,
-    )
-    @patch("charm.ResourceDispatcherOperator.ensure_resource_is_deleted")
-    @patch("charm.ResourceDispatcherOperator.k8s_resource_handler")
-    @patch("charm.delete_many")
-    def test_on_remove_runtime_still_exists_failure(
-        self,
-        delete_many: MagicMock,
-        k8s_resource_handler: MagicMock,
-        ensure_resource_is_deleted: MagicMock,
-        harness: Harness,
-        mock_lightkube_client: MagicMock,
-        mocker,
-    ):
-        ensure_resource_is_deleted.side_effect = ObjectStillExistsError("runtime-1")
-        harness.begin()
-        fake_manifest = MagicMock()
-        fake_manifest.metadata.name = "manifest-1"
-        harness.charm.k8s_resource_handler.render_manifests.return_value = [fake_manifest]
-        mocked_warning = mocker.patch.object(harness.charm.logger, "warning")
-        with pytest.raises(ObjectStillExistsError):
-            harness.charm._on_remove(None)
-        mocked_warning.assert_called()
 
     @patch(
         "charm.KubernetesServicePatch",

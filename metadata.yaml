@@ -17,7 +17,7 @@ resources:
   oci-image:
     type: oci-image
     description: Backing OCI image
-    upstream-source: docker.io/charmedkubeflow/resource-dispatcher:3.2-4fb4dfa
+    upstream-source: docker.io/charmedkubeflow/resource-dispatcher:3.3-f3d609a-20260625162501
 provides:
   provide-cmr-mesh:
     interface: cross_model_mesh
@@ -29,6 +29,8 @@ provides:
       are cross-model, relate that app to this additional relation to retrieve additional
       data required for these policies. This is required because Juju does not natively
       provide all information required to build these policies when related cross-model.
+  config-maps:
+    interface: kubernetes_manifest
   secrets:
     interface: kubernetes_manifest
   service-accounts:

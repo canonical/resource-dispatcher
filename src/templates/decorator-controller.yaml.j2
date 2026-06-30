@@ -11,6 +11,10 @@ spec:
       - {key: {{ label }}, operator: Exists}
   attachments:
   - apiVersion: v1
+    resource: configmaps
+    updateStrategy:
+      method: InPlace
+  - apiVersion: v1
     resource: secrets
     updateStrategy:
       method: InPlace

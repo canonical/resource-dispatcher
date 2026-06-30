@@ -183,7 +183,7 @@ jobs:
           for charm in *.charm; do
             [ -f "$charm" ] && CHARM_PATH_ARGS="$CHARM_PATH_ARGS --charm-path=$charm"
           done
-          tox -vve ${{ matrix.tox-env-istio-mode }}-${{ matrix.tox-env-type }} -- $CHARM_PATH_ARGS
+          tox -e ${{ matrix.tox-env-istio-mode }}-${{ matrix.tox-env-type }} -- $CHARM_PATH_ARGS --model testing
 
       # On failure, capture debugging resources
       - name: Get all
@@ -191,7 +191,7 @@ jobs:
         if: failure()
 
       - name: Get juju status
-        run: juju status
+        run: juju status --relations
         if: always()
 
       - name: Get workload logs

@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: test2-configmap
+  labels:
+    user.kubeflow.org/enabled: "true"
+data:
+  defaultPipelineRoot: minio://mlpipeline
+  providers: |-
+    minio:
+      default:
+        endpoint: minio:9000.test-kubeflow
+        region: minio
+        credentials:
+          fromEnv: false
+          secretRef:
+            secretName: mlpipeline-minio-artifact
+            accessKeyKey: accesskey
+            secretKeyKey: secretkey

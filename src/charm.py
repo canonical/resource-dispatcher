@@ -34,6 +34,7 @@ SERVICEACCOUNTS_RELATION_NAME = "service-accounts"
 SERVICE_MESH_RELATION_NAME = "service-mesh"
 ROLES_RELATION_NAME = "roles"
 ROLEBINDINGS_RELATION_NAME = "role-bindings"
+CONFIGMAPS_RELATION_NAME = "config-maps"
 
 
 class ResourceDispatcherOperator(CharmBase):
@@ -81,6 +82,9 @@ class ResourceDispatcherOperator(CharmBase):
             refresh_event=self.on.config_changed,
         )
 
+        self._configmaps_manifests_provider = KubernetesManifestsProvider(
+            charm=self, relation_name=CONFIGMAPS_RELATION_NAME
+        )
         self._poddefaults_manifests_provider = KubernetesManifestsProvider(
             charm=self, relation_name=PODDEFAULTS_RELATION_NAME
         )
@@ -97,6 +101,7 @@ class ResourceDispatcherOperator(CharmBase):
             charm=self, relation_name=ROLEBINDINGS_RELATION_NAME
         )
         for provider in [
+            self._configmaps_manifests_provider,
             self._poddefaults_manifests_provider,
             self._secrets_manifests_provider,
             self._serviceaccounts_manifests_provider,
@@ -146,6 +151,11 @@ class ResourceDispatcherOperator(CharmBase):
         return self._container
 
     @property
+    def configmaps_manifests_provider(self):
+        """Returns the KubernetesManifestsProvider for ConfigMaps"""
+        return self._configmaps_manifests_provider
+
+    @property
     def poddefaults_manifests_provider(self):
         """Returns the KubernetesManifestsProvider for Pod Defaults"""
         return self._poddefaults_manifests_provider
@@ -158,7 +168,7 @@ class ResourceDispatcherOperator(CharmBase):
     @property
     def service_accounts_manifests_provider(self):
         """Returns the KubernetesManifestsProvider for Service Accounts"""
-        return self._service_accounts_manifests_provider
+        return self._serviceaccounts_manifests_provider
 
     @property
     def _resource_dispatcher_operator_layer(self) -> Layer:
@@ -313,6 +323,10 @@ class ResourceDispatcherOperator(CharmBase):
             self._check_leader()
             self._check_container()
             self._update_layer()
+            self._update_manifests(
+                self._configmaps_manifests_provider,
+                f"{DISPATCHER_RESOURCES_PATH}/{CONFIGMAPS_RELATION_NAME}",
+            )
             self._update_manifests(
                 self._secrets_manifests_provider,
                 f"{DISPATCHER_RESOURCES_PATH}/{SECRETS_RELATION_NAME}",

@@ -14,7 +14,6 @@ from charms.resource_dispatcher.v0.kubernetes_manifests import (
 )
 from lightkube import ApiError
 from ops.model import BlockedStatus, MaintenanceStatus, WaitingStatus
-from ops.pebble import APIError as PebbleAPIError
 from ops.pebble import ChangeError
 from ops.pebble import Error as PebbleError
 from ops.pebble import Service

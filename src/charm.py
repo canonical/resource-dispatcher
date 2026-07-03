@@ -317,12 +317,10 @@ class ResourceDispatcherOperator(CharmBase):
             top_entries = self.container.list_files(push_location)
         except APIError as e:
             if e.code == 404:
-                self.logger.info(
-                    f"Resource push location '{push_location}' does not exist - creating it"
-                )
+                self.logger.info(f"Resource push location '{push_location}' does not exist")
                 top_entries = []
             else:
-                raise e
+                raise
 
         for entry in top_entries:
             if entry.path.endswith(".yaml"):

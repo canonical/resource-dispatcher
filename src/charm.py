@@ -307,7 +307,11 @@ class ResourceDispatcherOperator(CharmBase):
                 path = f"{push_location}/{subdir}/{name}.yaml"
                 desired[path] = yaml.dump(m)
 
-        # Enumerate existing files via a two-level walk (Pebble list_files is not recursive).
+        # Go over all top level files/directories in the push location
+        # - Remove legacy files (top-level *.yaml)
+        # - Ensure new files (each *.yaml in the proper namespace directory)
+        # Container.list_files should return only the top level files in the directory
+        # See: https://canonical.com/juju/docs/ops/latest/reference/ops/#ops.Container.list_files
         existing_paths: set[str] = set()
         try:
             top_entries = self.container.list_files(push_location)
@@ -322,10 +326,10 @@ class ResourceDispatcherOperator(CharmBase):
 
         for entry in top_entries:
             if entry.path.endswith(".yaml"):
-                # Legacy flat file from before the subdirectory layout — treat as existing.
+                # Legacy flat file from before the subdirectory layout —> treat as existing
                 existing_paths.add(entry.path)
             else:
-                # Subdirectory — list its contents.
+                # Subdirectory —> list its contents
                 try:
                     for child in self.container.list_files(entry.path):
                         if child.path.endswith(".yaml"):
@@ -333,14 +337,14 @@ class ResourceDispatcherOperator(CharmBase):
                 except APIError:
                     pass
 
-        # Remove stale files (including legacy flat files from before this change).
+        # Remove stale files (including legacy flat files)
         subdirs_with_removals: set[str] = set()
         for path in existing_paths:
             if path not in desired:
                 self.container.remove_path(path)
                 subdirs_with_removals.add(path.rsplit("/", 1)[0])
 
-        # Remove now-empty subdirectories (best-effort).
+        # Remove now-empty subdirectories
         for subdir in subdirs_with_removals:
             if subdir == push_location:
                 continue
@@ -351,7 +355,7 @@ class ResourceDispatcherOperator(CharmBase):
             except APIError:
                 pass
 
-        # Write desired files.
+        # Write desired files
         for path, content in desired.items():
             self.container.push(path, content, make_dirs=True)
 

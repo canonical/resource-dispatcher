@@ -369,10 +369,10 @@ def test_conflict_resolution_pinned_overrides_global(
     """When a pinned and a global manifest share a name, the pinned version wins in its namespace.
 
     The manifests-tester1 charm sends both:
-    * conflict-secret-global.yaml    – global (no namespace), AWS_ACCESS_KEY_ID: global-key
-    * conflict-secret-pinned.yaml    – pinned to the primary namespace, AWS_ACCESS_KEY_ID: pinned-key
+    * conflict-secret-global.yaml -> global (no namespace), AWS_ACCESS_KEY_ID: global-key
+    * conflict-secret-pinned.yaml -> pinned to the primary namespace, AWS_ACCESS_KEY_ID: pinned-key
 
-    The dispatcher image must resolve the conflict so that:
+    The dispatcher image should resolve the conflict so that:
     * The primary namespace receives the pinned version.
     * All other labeled namespaces receive the global version.
     """

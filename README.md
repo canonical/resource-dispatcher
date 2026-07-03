@@ -15,34 +15,28 @@ $ juju deploy resource-dispatcher
 ## Manifest conflict resolution
 
 Resource Dispatcher accepts manifests from multiple Juju relations. Each manifest is
-identified by the combination of its `metadata.namespace` and `metadata.name` fields.
+identified by the tuple (`metadata.namespace`, `metadata.name`).
 
 ### Pinned vs. global manifests
 
-A manifest that sets `metadata.namespace` is called a **namespace-pinned** manifest — it
-is applied only to that namespace. A manifest without `metadata.namespace` is called a
-**global** manifest — it is applied to every profile namespace.
+A manifest that sets `metadata.namespace` is called a **namespace-pinned** manifest, and is
+applied only to that namespace. A manifest without `metadata.namespace` is called a
+**global** manifest, and is applied to every profile namespace.
 
 When a pinned manifest and a global manifest share the same `metadata.name`, the pinned
 manifest **takes precedence** for its namespace. This allows a global default to be
-overridden for a specific namespace without causing an error.
+overridden for a specific namespace.
 
-### True conflicts (BlockedStatus)
+In the case of two manifests sharing the (`metadata.namespace`, `metadata.name`) key, a conflict occurs, resulting in a `BlockedStatus`. This includes two manifests with the same name and without a namespace.
 
-Two manifests are a **true conflict** when they share both the same `metadata.namespace`
-value (including both being unpinned) **and** the same `metadata.name`. When this occurs,
-the charm enters `BlockedStatus` and reports the conflicting `(namespace, name)` key in
-the status message. Resolve the conflict by removing the duplicate manifest from one of
-the relations.
-
-### On-disk layout
+### Manifest saving layout
 
 Manifests are written into the pebble layer under the dispatch folder using a two-level
 directory structure:
 
 ```
 <dispatch_folder>/
-  _global/           # unpinned (global) manifests
+  _global/           # unpinned manifests (no namespace)
     <name>.yaml
   <namespace>/       # namespace-pinned manifests
     <name>.yaml

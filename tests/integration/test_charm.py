@@ -369,8 +369,8 @@ def test_conflict_resolution_pinned_overrides_global(
     """When a pinned and a global manifest share a name, the pinned version wins in its namespace.
 
     The manifests-tester1 charm sends both:
-    * conflict-secret-global.yaml -> global (no namespace), AWS_ACCESS_KEY_ID: global-key
-    * conflict-secret-pinned.yaml -> pinned to the primary namespace, AWS_ACCESS_KEY_ID: pinned-key
+    * conflict-secret-global.yaml -> global (no namespace), accesskey: global-key
+    * conflict-secret-pinned.yaml -> pinned to the primary namespace, accesskey: pinned-key
 
     The dispatcher image should resolve the conflict so that:
     * The primary namespace receives the pinned version.
@@ -381,7 +381,7 @@ def test_conflict_resolution_pinned_overrides_global(
     primary_secret = assert_resource_status(
         lightkube_client, Secret, CONFLICT_TEST_SECRET_NAME, primary_namespace
     )
-    assert primary_secret.data["AWS_ACCESS_KEY_ID"] == CONFLICT_PINNED_ACCESS_KEY, (
+    assert primary_secret.data["accesskey"] == CONFLICT_PINNED_ACCESS_KEY, (
         f"Primary namespace '{primary_namespace}' should have the pinned version of "
         f"'{CONFLICT_TEST_SECRET_NAME}'"
     )
@@ -389,7 +389,7 @@ def test_conflict_resolution_pinned_overrides_global(
     secondary_secret = assert_resource_status(
         lightkube_client, Secret, CONFLICT_TEST_SECRET_NAME, secondary_namespace
     )
-    assert secondary_secret.data["AWS_ACCESS_KEY_ID"] == CONFLICT_GLOBAL_ACCESS_KEY, (
+    assert secondary_secret.data["accesskey"] == CONFLICT_GLOBAL_ACCESS_KEY, (
         f"Secondary namespace '{secondary_namespace}' should have the global version of "
         f"'{CONFLICT_TEST_SECRET_NAME}'"
     )

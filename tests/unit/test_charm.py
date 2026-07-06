@@ -321,19 +321,21 @@ class TestCharm:
         "charm.KubernetesServicePatch",
         lambda x, y, service_name, service_type, refresh_event: None,
     )
-    def test_manifests_valid_true(self, harness: Harness, mock_lightkube_client: MagicMock):
+    def test_find_manifest_conflicts_no_conflicts(
+        self, harness: Harness, mock_lightkube_client: MagicMock
+    ):
         harness.begin()
-        response = harness.charm._manifests_valid(VALID_MANIFESTS)
-        assert response == True
+        assert harness.charm._find_manifest_conflicts(VALID_MANIFESTS) == []
 
     @patch(
         "charm.KubernetesServicePatch",
         lambda x, y, service_name, service_type, refresh_event: None,
     )
-    def test_manifests_valid_false(self, harness: Harness, mock_lightkube_client: MagicMock):
+    def test_find_manifest_conflicts_with_conflicts(
+        self, harness: Harness, mock_lightkube_client: MagicMock
+    ):
         harness.begin()
-        response = harness.charm._manifests_valid(INVALID_MANIFESTS)
-        assert response == False
+        assert harness.charm._find_manifest_conflicts(INVALID_MANIFESTS) != []
 
     @patch(
         "charm.KubernetesServicePatch",
@@ -359,16 +361,16 @@ class TestCharm:
     )
     @patch("charm.ResourceDispatcherOperator.secrets_manifests_provider")
     @patch("charm.ResourceDispatcherOperator._sync_manifests")
-    @patch("charm.ResourceDispatcherOperator._manifests_valid")
+    @patch("charm.ResourceDispatcherOperator._find_manifest_conflicts")
     def test_update_manifests_invalid_manifests(
         self,
-        manifests_valid: MagicMock,
+        find_manifest_conflicts: MagicMock,
         _: MagicMock,
         secrets_manifests_provider: MagicMock,
         harness: Harness,
         mock_lightkube_client: MagicMock,
     ):
-        manifests_valid.return_value = False
+        find_manifest_conflicts.return_value = [(None, "conflict")]
         secrets_manifests_provider.get_manifests.return_value = ""
         harness.begin()
         with pytest.raises(ErrorWithStatus) as e_info:
@@ -532,30 +534,31 @@ _PUSH_LOCATION = "/var/lib/pebble/default/resources/test-type"
 
 
 class TestManifestsValid:
-    """Parametrised tests for ResourceDispatcherOperator._manifests_valid."""
+    """Parametrised tests for ResourceDispatcherOperator._find_manifest_conflicts."""
 
     @_KSP_PATCH
     @pytest.mark.parametrize(
-        "manifests, expected",
+        "manifests, expect_conflicts",
         [
-            # No manifests —> valid
-            ([], True),
-            (None, True),
-            # Different names, no namespace —> valid
-            ([{"metadata": {"name": "a"}}, {"metadata": {"name": "b"}}], True),
-            # Same name, different namespaces (one unpinned, one pinned) —> valid
-            (VALID_MANIFESTS_SAME_NAME_DIFF_NS, True),
-            # Two unpinned with same name —> invalid
-            (INVALID_MANIFESTS, False),
-            # Two with same namespace and same name —> invalid
-            (INVALID_MANIFESTS_SAME_NS, False),
+            # No manifests —> no conflicts
+            ([], False),
+            (None, False),
+            # Different names, no namespace —> no conflicts
+            ([{"metadata": {"name": "a"}}, {"metadata": {"name": "b"}}], False),
+            # Same name, different namespaces (one unpinned, one pinned) —> no conflicts
+            (VALID_MANIFESTS_SAME_NAME_DIFF_NS, False),
+            # Two unpinned with same name —> conflict
+            (INVALID_MANIFESTS, True),
+            # Two with same namespace and same name —> conflict
+            (INVALID_MANIFESTS_SAME_NS, True),
         ],
     )
-    def test_manifests_valid(
-        self, manifests, expected, harness: Harness, mock_lightkube_client: MagicMock
+    def test_find_manifest_conflicts(
+        self, manifests, expect_conflicts, harness: Harness, mock_lightkube_client: MagicMock
     ):
         harness.begin()
-        assert harness.charm._manifests_valid(manifests) == expected
+        result = harness.charm._find_manifest_conflicts(manifests)
+        assert bool(result) == expect_conflicts
 
     @_KSP_PATCH
     def test_conflict_message_names_key(self, harness: Harness, mock_lightkube_client: MagicMock):

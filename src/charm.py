@@ -4,6 +4,7 @@
 #
 
 import logging
+from collections import Counter
 
 import yaml
 from charmed_kubeflow_chisme.exceptions import ErrorWithStatus, GenericCharmRuntimeError
@@ -256,31 +257,6 @@ class ResourceDispatcherOperator(CharmBase):
             except ChangeError as err:
                 raise GenericCharmRuntimeError(f"Failed to replan with error: {str(err)}") from err
 
-    def _manifests_valid(self, manifests):
-        """Checks if manifests are unique by (metadata.namespace, metadata.name).
-
-        Two manifests are considered conflicting when they share the same name AND the same
-        namespace value (including both being unpinned, i.e. no metadata.namespace set).
-        A pinned manifest (has metadata.namespace) and an unpinned one sharing the same name
-        are NOT a conflict — the image-side dispatcher resolves that at apply time.
-
-        Returns:
-            True if no conflicts exist, False otherwise.
-        """
-        if not manifests:
-            return True
-        seen = set()
-        for manifest in manifests:
-            metadata = manifest.get("metadata", {})
-            key = (metadata.get("namespace"), metadata.get("name"))
-            if key in seen:
-                self.logger.debug(
-                    f"Conflicting manifests found for namespace={key[0]!r} name={key[1]!r}"
-                )
-                return False
-            seen.add(key)
-        return True
-
     def _sync_manifests(self, manifests, push_location):
         """Push list of manifests into the pebble layer using a two-level directory layout.
 
@@ -361,8 +337,8 @@ class ResourceDispatcherOperator(CharmBase):
         """Get manifests from relation and update them in dispatcher folder."""
         manifests = manifests_provider.get_manifests()
         self.logger.debug(f"manifests are {manifests}")
-        if not self._manifests_valid(manifests):
-            conflicts = self._find_manifest_conflicts(manifests)
+        conflicts = self._find_manifest_conflicts(manifests)
+        if conflicts:
             conflict_summary = "; ".join(
                 f"namespace={ns!r} name={name!r}" for ns, name in conflicts
             )
@@ -377,14 +353,26 @@ class ResourceDispatcherOperator(CharmBase):
         self._sync_manifests(manifests, dispatch_folder)
 
     def _find_manifest_conflicts(self, manifests):
-        """Return a list of (namespace, name) keys that appear more than once."""
-        from collections import Counter
+        """Return a list of (namespace, name) keys that appear more than once.
 
+        Two manifests are considered conflicting when they share the same name AND the same
+        namespace value (including both being unpinned, i.e. no metadata.namespace set).
+        A pinned manifest (has metadata.namespace) and an unpinned one sharing the same name
+        are NOT a conflict — the image-side dispatcher resolves that at apply time.
+
+        Returns:
+            List of conflicting (namespace, name) tuples; empty if no conflicts exist.
+        """
+        if not manifests:
+            return []
         counts = Counter(
             (m.get("metadata", {}).get("namespace"), m.get("metadata", {}).get("name"))
             for m in manifests
         )
-        return [key for key, count in counts.items() if count > 1]
+        conflicts = [key for key, count in counts.items() if count > 1]
+        for ns, name in conflicts:
+            self.logger.debug(f"Conflicting manifests found for namespace={ns!r} name={name!r}")
+        return conflicts
 
     def _on_event(self, event: EventBase) -> None:
         """Perform all required actions for the Charm."""

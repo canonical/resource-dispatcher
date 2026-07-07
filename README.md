@@ -12,6 +12,36 @@ follows
 $ juju deploy resource-dispatcher
 ```
 
+## Manifest conflict resolution
+
+Resource Dispatcher accepts manifests from multiple Juju relations. Each manifest is
+identified by the tuple (`metadata.namespace`, `metadata.name`).
+
+### Pinned vs. global manifests
+
+A manifest that sets `metadata.namespace` is called a **namespace-pinned** manifest, and is
+applied only to that namespace. A manifest without `metadata.namespace` is called a
+**global** manifest, and is applied to every profile namespace.
+
+When a pinned manifest and a global manifest share the same `metadata.name`, the pinned
+manifest **takes precedence** for its namespace. This allows a global default to be
+overridden for a specific namespace.
+
+In the case of two manifests sharing the (`metadata.namespace`, `metadata.name`) key, a conflict occurs, resulting in a `BlockedStatus`. This includes two manifests with the same name and without a namespace.
+
+### Manifest saving layout
+
+Manifests are written into the pebble layer under the dispatch folder using a two-level
+directory structure:
+
+```
+<dispatch_folder>/
+  _global/           # unpinned manifests (no namespace)
+    <name>.yaml
+  <namespace>/       # namespace-pinned manifests
+    <name>.yaml
+```
+
 ## Looking for a fully supported platform for MLOps?
 
 Canonical [Charmed Kubeflow](https://charmed-kubeflow.io) is a state of the art, fully supported MLOps platform that helps data scientists collaborate on AI innovation on any cloud from concept to production, offered by Canonical - the publishers of [Ubuntu](https://ubuntu.com).

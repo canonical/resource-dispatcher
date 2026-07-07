@@ -69,6 +69,11 @@ PROFILE_AGNOSTIC_SECRET2 = "mlpipeline-minio-artifact4"
 TESTER1_CONFIGMAPS_NAMES = ["test1-configmap"]
 TESTER2_CONFIGMAPS_NAMES = ["test2-configmap"]
 
+CONFLICT_TEST_SECRET_NAME = "conflict-test-secret"
+# These values match the stringData in the two conflict-secret fixture files.
+CONFLICT_GLOBAL_ACCESS_KEY = base64.b64encode(b"global-key").decode("utf-8")
+CONFLICT_PINNED_ACCESS_KEY = base64.b64encode(b"pinned-key").decode("utf-8")
+
 
 PodDefault = create_namespaced_resource("kubeflow.org", "v1alpha1", "PodDefault", "poddefaults")
 
@@ -355,6 +360,39 @@ def test_manifest_namespace_scoping(
     # manifests without metadata.namespace are applied to all profile namespaces
     assert_resource_status(lightkube_client, Secret, profile_agnostic_secret, primary_namespace)
     assert_resource_status(lightkube_client, Secret, profile_agnostic_secret, secondary_namespace)
+
+
+def test_conflict_resolution_pinned_overrides_global(
+    lightkube_client: lightkube.Client,
+    profile_namespaces: tuple[str, str],
+) -> None:
+    """When a pinned and a global manifest share a name, the pinned version wins in its namespace.
+
+    The manifests-tester1 charm sends both:
+    * conflict-secret-global.yaml -> global (no namespace), accesskey: global-key
+    * conflict-secret-pinned.yaml -> pinned to the primary namespace, accesskey: pinned-key
+
+    The dispatcher image should resolve the conflict so that:
+    * The primary namespace receives the pinned version.
+    * All other labeled namespaces receive the global version.
+    """
+    primary_namespace, secondary_namespace = profile_namespaces
+
+    primary_secret = assert_resource_status(
+        lightkube_client, Secret, CONFLICT_TEST_SECRET_NAME, primary_namespace
+    )
+    assert primary_secret.data["accesskey"] == CONFLICT_PINNED_ACCESS_KEY, (
+        f"Primary namespace '{primary_namespace}' should have the pinned version of "
+        f"'{CONFLICT_TEST_SECRET_NAME}'"
+    )
+
+    secondary_secret = assert_resource_status(
+        lightkube_client, Secret, CONFLICT_TEST_SECRET_NAME, secondary_namespace
+    )
+    assert secondary_secret.data["accesskey"] == CONFLICT_GLOBAL_ACCESS_KEY, (
+        f"Secondary namespace '{secondary_namespace}' should have the global version of "
+        f"'{CONFLICT_TEST_SECRET_NAME}'"
+    )
 
 
 @pytest.mark.parametrize(

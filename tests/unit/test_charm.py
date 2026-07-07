@@ -14,7 +14,9 @@ from charms.resource_dispatcher.v0.kubernetes_manifests import (
 )
 from lightkube import ApiError
 from ops.model import BlockedStatus, MaintenanceStatus, WaitingStatus
-from ops.pebble import ChangeError, Service
+from ops.pebble import ChangeError
+from ops.pebble import Error as PebbleError
+from ops.pebble import Service
 from ops.testing import Harness
 
 from charm import ResourceDispatcherOperator
@@ -62,6 +64,17 @@ SERVICE_MESH_RELATION_PROVIDER = "istio-beacon-k8s"
 
 VALID_MANIFESTS = [{"metadata": {"name": "a"}}, {"metadata": {"name": "b"}}]
 INVALID_MANIFESTS = VALID_MANIFESTS + [{"metadata": {"name": "a"}}]
+
+# Same name, different (or missing) namespaces — each is a distinct key and should be valid.
+VALID_MANIFESTS_SAME_NAME_DIFF_NS = [
+    {"metadata": {"name": "foo"}},
+    {"metadata": {"name": "foo", "namespace": "ns-a"}},
+]
+# Same name AND same namespace — real conflict.
+INVALID_MANIFESTS_SAME_NS = [
+    {"metadata": {"name": "foo", "namespace": "ns-a"}},
+    {"metadata": {"name": "foo", "namespace": "ns-a"}},
+]
 
 
 class _FakeResponse:
@@ -308,19 +321,21 @@ class TestCharm:
         "charm.KubernetesServicePatch",
         lambda x, y, service_name, service_type, refresh_event: None,
     )
-    def test_manifests_valid_true(self, harness: Harness, mock_lightkube_client: MagicMock):
+    def test_find_manifest_conflicts_no_conflicts(
+        self, harness: Harness, mock_lightkube_client: MagicMock
+    ):
         harness.begin()
-        response = harness.charm._manifests_valid(VALID_MANIFESTS)
-        assert response == True
+        assert harness.charm._find_manifest_conflicts(VALID_MANIFESTS) == []
 
     @patch(
         "charm.KubernetesServicePatch",
         lambda x, y, service_name, service_type, refresh_event: None,
     )
-    def test_manifests_valid_false(self, harness: Harness, mock_lightkube_client: MagicMock):
+    def test_find_manifest_conflicts_with_conflicts(
+        self, harness: Harness, mock_lightkube_client: MagicMock
+    ):
         harness.begin()
-        response = harness.charm._manifests_valid(INVALID_MANIFESTS)
-        assert response == False
+        assert harness.charm._find_manifest_conflicts(INVALID_MANIFESTS) != []
 
     @patch(
         "charm.KubernetesServicePatch",
@@ -346,21 +361,21 @@ class TestCharm:
     )
     @patch("charm.ResourceDispatcherOperator.secrets_manifests_provider")
     @patch("charm.ResourceDispatcherOperator._sync_manifests")
-    @patch("charm.ResourceDispatcherOperator._manifests_valid")
+    @patch("charm.ResourceDispatcherOperator._find_manifest_conflicts")
     def test_update_manifests_invalid_manifests(
         self,
-        manifests_valid: MagicMock,
+        find_manifest_conflicts: MagicMock,
         _: MagicMock,
         secrets_manifests_provider: MagicMock,
         harness: Harness,
         mock_lightkube_client: MagicMock,
     ):
-        manifests_valid.return_value = False
+        find_manifest_conflicts.return_value = [(None, "conflict")]
         secrets_manifests_provider.get_manifests.return_value = ""
         harness.begin()
         with pytest.raises(ErrorWithStatus) as e_info:
             harness.charm._update_manifests(secrets_manifests_provider, "")
-        assert "Failed to process invalid manifest. See debug logs" in str(e_info)
+        assert "Conflicting manifests" in str(e_info)
         assert e_info.value.status_type(BlockedStatus)
 
     @patch(
@@ -509,3 +524,159 @@ class TestCharm:
             # assert (the rest):
 
             assert "Error validating raw policies" in str(exc_info.value)
+
+
+_KSP_PATCH = patch(
+    "charm.KubernetesServicePatch",
+    lambda x, y, service_name, service_type, refresh_event: None,
+)
+_PUSH_LOCATION = "/var/lib/pebble/default/resources/test-type"
+
+
+class TestManifestsValid:
+    """Parametrised tests for ResourceDispatcherOperator._find_manifest_conflicts."""
+
+    @_KSP_PATCH
+    @pytest.mark.parametrize(
+        "manifests, expect_conflicts",
+        [
+            # No manifests —> no conflicts
+            ([], False),
+            (None, False),
+            # Different names, no namespace —> no conflicts
+            ([{"metadata": {"name": "a"}}, {"metadata": {"name": "b"}}], False),
+            # Same name, different namespaces (one unpinned, one pinned) —> no conflicts
+            (VALID_MANIFESTS_SAME_NAME_DIFF_NS, False),
+            # Two unpinned with same name —> conflict
+            (INVALID_MANIFESTS, True),
+            # Two with same namespace and same name —> conflict
+            (INVALID_MANIFESTS_SAME_NS, True),
+        ],
+    )
+    def test_find_manifest_conflicts(
+        self, manifests, expect_conflicts, harness: Harness, mock_lightkube_client: MagicMock
+    ):
+        harness.begin()
+        result = harness.charm._find_manifest_conflicts(manifests)
+        assert bool(result) == expect_conflicts
+
+    @_KSP_PATCH
+    def test_conflict_message_names_key(self, harness: Harness, mock_lightkube_client: MagicMock):
+        """BlockedStatus message includes the conflicting namespace/name."""
+        conflicting = [
+            {"metadata": {"name": "foo", "namespace": "ns-a"}},
+            {"metadata": {"name": "foo", "namespace": "ns-a"}},
+        ]
+        harness.begin()
+        with patch.object(
+            harness.charm._secrets_manifests_provider, "get_manifests", return_value=conflicting
+        ):
+            with pytest.raises(ErrorWithStatus) as exc_info:
+                harness.charm._update_manifests(
+                    harness.charm._secrets_manifests_provider, _PUSH_LOCATION
+                )
+        msg = str(exc_info.value)
+        assert "ns-a" in msg
+        assert "foo" in msg
+        assert exc_info.value.status_type(BlockedStatus)
+
+
+class TestSyncManifests:
+    """Tests for ResourceDispatcherOperator._sync_manifests."""
+
+    @_KSP_PATCH
+    def test_global_manifest_written_to_global_subdir(
+        self, harness: Harness, mock_lightkube_client: MagicMock
+    ):
+        """An unpinned manifest is written to _global/{name}.yaml."""
+        harness.begin()
+        manifest = {"metadata": {"name": "foo"}, "kind": "Secret", "apiVersion": "v1"}
+        harness.charm._sync_manifests([manifest], _PUSH_LOCATION)
+        content = harness.charm.container.pull(f"{_PUSH_LOCATION}/_global/foo.yaml").read()
+        assert "foo" in content
+
+    @_KSP_PATCH
+    def test_pinned_manifest_written_to_ns_subdir(
+        self, harness: Harness, mock_lightkube_client: MagicMock
+    ):
+        """A namespace-pinned manifest is written to {ns}/{name}.yaml."""
+        harness.begin()
+        manifest = {
+            "metadata": {"name": "foo", "namespace": "profile-a"},
+            "kind": "Secret",
+            "apiVersion": "v1",
+        }
+        harness.charm._sync_manifests([manifest], _PUSH_LOCATION)
+        content = harness.charm.container.pull(f"{_PUSH_LOCATION}/profile-a/foo.yaml").read()
+        assert "foo" in content
+
+    @_KSP_PATCH
+    def test_global_and_pinned_coexist(self, harness: Harness, mock_lightkube_client: MagicMock):
+        """A global and a pinned manifest with the same name live at separate paths."""
+        harness.begin()
+        global_m = {"metadata": {"name": "foo"}, "kind": "Secret", "apiVersion": "v1"}
+        pinned_m = {
+            "metadata": {"name": "foo", "namespace": "ns-a"},
+            "kind": "Secret",
+            "apiVersion": "v1",
+        }
+        harness.charm._sync_manifests([global_m, pinned_m], _PUSH_LOCATION)
+        harness.charm.container.pull(f"{_PUSH_LOCATION}/_global/foo.yaml").read()
+        harness.charm.container.pull(f"{_PUSH_LOCATION}/ns-a/foo.yaml").read()
+
+    @_KSP_PATCH
+    def test_stale_global_file_removed(self, harness: Harness, mock_lightkube_client: MagicMock):
+        """A previously-synced global file is removed when absent from the new manifest set."""
+        harness.begin()
+        harness.charm._sync_manifests(
+            [{"metadata": {"name": "stale"}, "kind": "Secret", "apiVersion": "v1"}],
+            _PUSH_LOCATION,
+        )
+        # Verify the file exists before the second sync.
+        assert (
+            "stale" in harness.charm.container.pull(f"{_PUSH_LOCATION}/_global/stale.yaml").read()
+        )
+        harness.charm._sync_manifests([], _PUSH_LOCATION)
+        with pytest.raises(PebbleError):
+            harness.charm.container.pull(f"{_PUSH_LOCATION}/_global/stale.yaml")
+
+    @_KSP_PATCH
+    def test_stale_pinned_file_removed(self, harness: Harness, mock_lightkube_client: MagicMock):
+        """A previously-synced pinned file is removed when absent from the new manifest set."""
+        harness.begin()
+        harness.charm._sync_manifests(
+            [
+                {
+                    "metadata": {"name": "stale", "namespace": "ns-a"},
+                    "kind": "Secret",
+                    "apiVersion": "v1",
+                }
+            ],
+            _PUSH_LOCATION,
+        )
+        # Verify the file exists before the second sync.
+        assert "stale" in harness.charm.container.pull(f"{_PUSH_LOCATION}/ns-a/stale.yaml").read()
+        harness.charm._sync_manifests([], _PUSH_LOCATION)
+        with pytest.raises(PebbleError):
+            harness.charm.container.pull(f"{_PUSH_LOCATION}/ns-a/stale.yaml")
+
+    @_KSP_PATCH
+    def test_legacy_flat_file_removed(self, harness: Harness, mock_lightkube_client: MagicMock):
+        """A legacy flat-layout file at {push_location}/{name}.yaml is cleaned up on upgrade."""
+        harness.begin()
+        # Simulate a pre-upgrade flat file written by the old _sync_manifests.
+        harness.charm.container.push(
+            f"{_PUSH_LOCATION}/legacy.yaml", "legacy content", make_dirs=True
+        )
+        # Verify the file exists before sync.
+        assert (
+            harness.charm.container.pull(f"{_PUSH_LOCATION}/legacy.yaml").read()
+            == "legacy content"
+        )
+        # Sync with a different manifest —> legacy file is not in desired set.
+        harness.charm._sync_manifests(
+            [{"metadata": {"name": "new"}, "kind": "Secret", "apiVersion": "v1"}],
+            _PUSH_LOCATION,
+        )
+        with pytest.raises(PebbleError):
+            harness.charm.container.pull(f"{_PUSH_LOCATION}/legacy.yaml")

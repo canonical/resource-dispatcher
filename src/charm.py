@@ -4,6 +4,7 @@
 #
 
 import logging
+from collections import Counter
 
 import yaml
 from charmed_kubeflow_chisme.exceptions import ErrorWithStatus, GenericCharmRuntimeError
@@ -256,65 +257,122 @@ class ResourceDispatcherOperator(CharmBase):
             except ChangeError as err:
                 raise GenericCharmRuntimeError(f"Failed to replan with error: {str(err)}") from err
 
-    def _manifests_valid(self, manifests):
-        """Checks if manifests are unique."""
-        if manifests:
-            for manifest in manifests:
-                if (
-                    sum([m["metadata"]["name"] == manifest["metadata"]["name"] for m in manifests])
-                    > 1
-                ):
-                    return False
-        return True
-
     def _sync_manifests(self, manifests, push_location):
-        """Push list of manifests into layer.
+        """Push list of manifests into the pebble layer using a two-level directory layout.
+
+        Unpinned manifests (no metadata.namespace) are written to:
+            {push_location}/_global/{name}.yaml
+
+        Namespace-pinned manifests are written to:
+            {push_location}/{namespace}/{name}.yaml
+
+        Any previously-written YAML that is no longer in the desired set is removed.
+        Empty subdirectories are removed after cleanup.
 
         Args:
             manifests: List of kubernetes manifests to be pushed to pebble layer.
             push_location: Container location where the manifests should be pushed to.
         """
+        # Compute the desired on-disk paths and build the new file contents.
+        desired: dict[str, str] = {}
+        if manifests:
+            for m in manifests:
+                ns = m.get("metadata", {}).get("namespace")
+                name = m["metadata"]["name"]
+                subdir = ns if ns else "_global"
+                path = f"{push_location}/{subdir}/{name}.yaml"
+                desired[path] = yaml.dump(m)
+
+        # Go over all top level files/directories in the push location
+        # - Remove legacy files (top-level *.yaml)
+        # - Ensure new files (each *.yaml in the proper namespace directory)
+        # Container.list_files should return only the top level files in the directory
+        # See: https://canonical.com/juju/docs/ops/latest/reference/ops/#ops.Container.list_files
+        existing_paths: set[str] = set()
         try:
-            all_files = self.container.list_files(push_location)
+            top_entries = self.container.list_files(push_location)
         except APIError as e:
-            if "no such file or directory" in e.message:
-                self.logger.info(
-                    f"Resource push location '{push_location}' does not exist - creating it"
-                )
-                all_files = []
+            if e.code == 404:
+                self.logger.info(f"Resource push location '{push_location}' does not exist")
+                top_entries = []
             else:
-                raise e
-        if manifests:
-            manifests_locations = [
-                f"{push_location}/{m['metadata']['name']}.yaml" for m in manifests
-            ]
-        else:
-            manifests_locations = []
-        if all_files:
-            for file in all_files:
-                if file.path not in manifests_locations:
-                    self.container.remove_path(file.path)
-        if manifests:
-            for manifest in manifests:
-                filename = manifest["metadata"]["name"]
-                self.container.push(
-                    f"{push_location}/{filename}.yaml", yaml.dump(manifest), make_dirs=True
-                )
+                raise
+
+        for entry in top_entries:
+            if entry.path.endswith(".yaml"):
+                # Legacy flat file from before the subdirectory layout —> treat as existing
+                existing_paths.add(entry.path)
+            else:
+                # Subdirectory —> list its contents
+                try:
+                    for child in self.container.list_files(entry.path):
+                        if child.path.endswith(".yaml"):
+                            existing_paths.add(child.path)
+                except APIError:
+                    pass
+
+        # Remove stale files (including legacy flat files)
+        subdirs_with_removals: set[str] = set()
+        for path in existing_paths:
+            if path not in desired:
+                self.container.remove_path(path)
+                subdirs_with_removals.add(path.rsplit("/", 1)[0])
+
+        # Remove now-empty subdirectories
+        for subdir in subdirs_with_removals:
+            if subdir == push_location:
+                continue
+            try:
+                remaining = self.container.list_files(subdir)
+                if not remaining:
+                    self.container.remove_path(subdir)
+            except APIError:
+                pass
+
+        # Write desired files
+        for path, content in desired.items():
+            self.container.push(path, content, make_dirs=True)
 
     def _update_manifests(self, manifests_provider, dispatch_folder):
         """Get manifests from relation and update them in dispatcher folder."""
         manifests = manifests_provider.get_manifests()
         self.logger.debug(f"manifests are {manifests}")
-        if not self._manifests_valid(manifests):
+        conflicts = self._find_manifest_conflicts(manifests)
+        if conflicts:
+            conflict_summary = "; ".join(
+                f"namespace={ns!r} name={name!r}" for ns, name in conflicts
+            )
             self.logger.debug(
                 f"Manifests names in all relations must be unique {','.join(str(m) for m in manifests)}"  # noqa E501
             )
             raise ErrorWithStatus(
-                "Failed to process invalid manifest. See debug logs.",
+                f"Conflicting manifests ({conflict_summary}). See debug logs.",
                 BlockedStatus,
             )
         self.logger.debug(f"received {manifests_provider._relation_name} are {manifests}")
         self._sync_manifests(manifests, dispatch_folder)
+
+    def _find_manifest_conflicts(self, manifests):
+        """Return a list of (namespace, name) keys that appear more than once.
+
+        Two manifests are considered conflicting when they share the same name AND the same
+        namespace value (including both being unpinned, i.e. no metadata.namespace set).
+        A pinned manifest (has metadata.namespace) and an unpinned one sharing the same name
+        are NOT a conflict — the image-side dispatcher resolves that at apply time.
+
+        Returns:
+            List of conflicting (namespace, name) tuples; empty if no conflicts exist.
+        """
+        if not manifests:
+            return []
+        counts = Counter(
+            (m.get("metadata", {}).get("namespace"), m.get("metadata", {}).get("name"))
+            for m in manifests
+        )
+        conflicts = [key for key, count in counts.items() if count > 1]
+        for ns, name in conflicts:
+            self.logger.debug(f"Conflicting manifests found for namespace={ns!r} name={name!r}")
+        return conflicts
 
     def _on_event(self, event: EventBase) -> None:
         """Perform all required actions for the Charm."""

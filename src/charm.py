@@ -69,9 +69,6 @@ class ResourceDispatcherOperator(CharmBase):
         self.framework.observe(self.on.upgrade_charm, self._on_upgrade_charm)
         self.framework.observe(self.on.config_changed, self._on_event)
         self.framework.observe(self.on.remove, self._on_remove)
-        # Reapply the Pebble workload layer when the container becomes ready (initial start,
-        # restart, upgrade) and periodically via update-status, so that a lost/empty plan is
-        # repaired automatically (see: https://github.com/canonical/resource-dispatcher/issues/168).
         self.framework.observe(self.on.resource_dispatcher_pebble_ready, self._on_event)
         self.framework.observe(self.on.update_status, self._on_event)
 

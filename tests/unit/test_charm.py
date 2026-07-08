@@ -393,6 +393,56 @@ class TestCharm:
         harness.charm.on.upgrade_charm.emit()
         deploy_k8s_resources.assert_called_once()
 
+    @patch(
+        "charm.KubernetesServicePatch",
+        lambda x, y, service_name, service_type, refresh_event: None,
+    )
+    def test_pebble_ready_triggers_on_event(
+        self,
+        harness: Harness,
+        mock_lightkube_client: MagicMock,
+    ):
+        """The pebble-ready event applies the workload Pebble layer via _on_event."""
+        harness.begin()
+        # Sanity-check: the plan starts empty (no services configured).
+        assert harness.charm.container.get_plan().services == {}
+        harness.container_pebble_ready("resource-dispatcher")
+        assert harness.charm.container.get_plan().services == EXPECTED_SERVICE
+
+    @patch(
+        "charm.KubernetesServicePatch",
+        lambda x, y, service_name, service_type, refresh_event: None,
+    )
+    @patch("charm.ResourceDispatcherOperator._update_layer")
+    def test_update_status_triggers_reconciliation(
+        self,
+        update_layer: MagicMock,
+        harness: Harness,
+        mock_lightkube_client: MagicMock,
+    ):
+        """The update-status event triggers reconciliation (which reapplies the Pebble layer)."""
+        harness.begin()
+        harness.charm.on.update_status.emit()
+        update_layer.assert_called_once()
+
+    @patch(
+        "charm.KubernetesServicePatch",
+        lambda x, y, service_name, service_type, refresh_event: None,
+    )
+    def test_update_status_recovers_empty_plan(
+        self,
+        harness: Harness,
+        mock_lightkube_client: MagicMock,
+    ):
+        """Regression test for GH#168: an empty Pebble plan is repaired via update-status."""
+        harness.begin()
+        # Simulate the reported failure mode: the container is running but its Pebble plan
+        # is empty (no workload service).
+        assert harness.charm.container.get_plan().services == {}
+        harness.charm.on.update_status.emit()
+        # After update-status, the workload service should be back in the plan.
+        assert harness.charm.container.get_plan().services == EXPECTED_SERVICE
+
     @patch("charm.KubernetesResourceHandler")
     @patch(
         "charm.KubernetesServicePatch",

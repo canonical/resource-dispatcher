@@ -67,6 +67,8 @@ class ResourceDispatcherOperator(CharmBase):
         self.framework.observe(self.on.upgrade_charm, self._on_upgrade_charm)
         self.framework.observe(self.on.config_changed, self._on_event)
         self.framework.observe(self.on.remove, self._on_remove)
+        self.framework.observe(self.on.resource_dispatcher_pebble_ready, self._on_event)
+        self.framework.observe(self.on.update_status, self._on_event)
 
         port = ServicePort(
             port=self._service_port, targetPort=self._webserver_port, name=f"{self.app.name}"
@@ -205,10 +207,9 @@ class ResourceDispatcherOperator(CharmBase):
             self.logger.info("Not a leader, skipping setup")
             raise ErrorWithStatus("Waiting for leadership", WaitingStatus)
 
-    def _check_container(self, event: EventBase):
+    def _check_container(self):
         """Check if we can connect the container."""
         if not self.container.can_connect():
-            event.defer()
             raise ErrorWithStatus("Container is not ready", WaitingStatus)
 
     def _deploy_k8s_resources(self) -> None:
@@ -310,7 +311,7 @@ class ResourceDispatcherOperator(CharmBase):
         """Perform all required actions for the Charm."""
         try:
             self._check_leader()
-            self._check_container(event)
+            self._check_container()
             self._update_layer()
             self._update_manifests(
                 self._secrets_manifests_provider,

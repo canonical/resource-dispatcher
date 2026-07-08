@@ -218,10 +218,9 @@ class ResourceDispatcherOperator(CharmBase):
             self.logger.info("Not a leader, skipping setup")
             raise ErrorWithStatus("Waiting for leadership", WaitingStatus)
 
-    def _check_container(self, event: EventBase):
+    def _check_container(self):
         """Check if we can connect the container."""
         if not self.container.can_connect():
-            event.defer()
             raise ErrorWithStatus("Container is not ready", WaitingStatus)
 
     def _deploy_k8s_resources(self) -> None:
@@ -380,7 +379,7 @@ class ResourceDispatcherOperator(CharmBase):
         """Perform all required actions for the Charm."""
         try:
             self._check_leader()
-            self._check_container(event)
+            self._check_container()
             self._update_layer()
             self._update_manifests(
                 self._configmaps_manifests_provider,

@@ -94,7 +94,7 @@ jobs:
       - unit
       - terraform-checks
     name: Build charm
-    uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@v49.0.1
+    uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@v51.0.0
     with:
       cache: true
     permissions:
@@ -112,7 +112,7 @@ jobs:
           - tests/integration/manifests-tester
           - tests/integration/manifests-tester-no-secret
     name: Build charm | ${{ matrix.charm }}
-    uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@v49.0.1
+    uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@v51.0.0
     with:
       path-to-charm-directory: ${{ matrix.charm }}
       cache: true
@@ -126,13 +126,13 @@ jobs:
     needs:
       - get-charm-paths-track
       - build
-    uses: canonical/data-platform-workflows/.github/workflows/release_charm_pr.yaml@v49.0.1
+    uses: canonical/data-platform-workflows/.github/workflows/release_charm_pr.yaml@v51.0.0
     with:
       track: ${{ needs.get-charm-paths-track.outputs.track }}
       artifact-prefix: ${{ needs.build.outputs.artifact-prefix }}
       path-to-charm-directory: .
     secrets:
-      charmhub-token: ${{ secrets.CHARMCRAFT_CREDENTIALS }}
+      charmhub-token: ${{ secrets.CHARMHUB_TOKEN_EDGE_PR }}
     permissions:
       actions: read
       contents: read

@@ -14,7 +14,7 @@ from charms.resource_dispatcher.v0.kubernetes_manifests import (
     KubernetesManifest,
     KubernetesManifestRequirerWrapper,
 )
-from ops import main
+from ops import EventBase, main
 from ops.charm import CharmBase
 from ops.model import ActiveStatus
 
@@ -101,10 +101,10 @@ class ManifestsTesterCharm(CharmBase):
 
     def _on_start(self, event):
         """Set active on start."""
-        self._update_manifests_in_relation(event=event)
+        self._update_manifests_in_relation(event)
         self.model.unit.status = ActiveStatus()
 
-    def _update_manifests_in_relation(self, event):
+    def _update_manifests_in_relation(self, _: EventBase):
         service_account_name = self.model.config["service_account_name"]
         serviceaccount_manifest = [
             KubernetesManifest(SERVICE_ACCOUNT_YAML.format(name=service_account_name))

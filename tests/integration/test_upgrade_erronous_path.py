@@ -18,11 +18,9 @@ from pathlib import Path
 
 import jubilant
 import lightkube
-import pytest
 import yaml
-from lightkube.core.exceptions import ApiError
 from lightkube.generic_resource import create_namespaced_resource
-from lightkube.resources.core_v1 import Secret, ServiceAccount
+from lightkube.resources.core_v1 import ConfigMap, Secret, ServiceAccount
 from lightkube.resources.rbac_authorization_v1 import Role, RoleBinding
 
 from .charms_dependencies import METACONTROLLER_OPERATOR, RESOURCE_DISPATCHER_NO_SECRET
@@ -30,6 +28,7 @@ from .helpers import (
     RESOURCE_DISPATCHER_CHARM_NAME,
     RESOURCE_DISPATCHER_NO_SECRET_OCI_IMAGE,
     RESOURCE_DISPATCHER_NO_SECRET_REVISION,
+    assert_resource_status,
     deploy_k8s_resources,
 )
 
@@ -56,6 +55,7 @@ TESTER_PODDEFAULTS_NAMES_NEW = ["access-minio", "mlflow-server-minio"]
 TESTER_ROLE_NAMES = ["test1-role"]
 TESTER_ROLEBINDING_NAMES = ["test1-rolebinding"]
 
+TESTER_CONFIGMAPS_NAMES = ["test1-configmap"]
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 PODDEFAULTS_CRD_TEMPLATE = "./tests/integration/resources/crds/poddefaults.yaml"
@@ -146,24 +146,19 @@ def test_manifests_created_from_tester_charm_old(
     time.sleep(
         30
     )  # sync can take up to 10 seconds for reconciliation loop to trigger (+ time to create namespace)
-    secret = lightkube_client.get(Secret, MINIO_SECRET_NAME_OLD, namespace=namespace)
-    service_account = lightkube_client.get(
-        ServiceAccount, SERVICE_ACCOUNT_NAME, namespace=namespace
-    )
-    # Teting one secret for content
+    assert_resource_status(lightkube_client, ServiceAccount, SERVICE_ACCOUNT_NAME, namespace)
+    secret = assert_resource_status(lightkube_client, Secret, MINIO_SECRET_NAME_OLD, namespace)
+    # Testing one secret for content
     assert secret.data == {
         "AWS_ACCESS_KEY_ID": base64.b64encode("access_key".encode("utf-8")).decode("utf-8"),
         "AWS_SECRET_ACCESS_KEY": base64.b64encode("secret_access_key".encode("utf-8")).decode(
             "utf-8"
         ),
     }
-    assert service_account != None
     for name in TESTER_SECRET_NAMES_OLD:
-        secret = lightkube_client.get(Secret, name, namespace=namespace)
-        assert secret != None
+        assert_resource_status(lightkube_client, Secret, name, namespace)
     for name in TESTER_PODDEFAULTS_NAMES_OLD:
-        pod_default = lightkube_client.get(PodDefault, name, namespace=namespace)
-        assert pod_default != None
+        assert_resource_status(lightkube_client, PodDefault, name, namespace)
 
 
 def test_upgrade_tester_charm(juju: jubilant.Juju, manifest_tester_charm: Path):
@@ -216,6 +211,9 @@ def test_integrate_new_relations_with_resource_dispatcher(
     juju.integrate(
         f"{RESOURCE_DISPATCHER_CHARM_NAME}:role-bindings", f"{MANIFEST_TESTER_CHARM}:role-bindings"
     )
+    juju.integrate(
+        f"{RESOURCE_DISPATCHER_CHARM_NAME}:config-maps", f"{MANIFEST_TESTER_CHARM}:config-maps"
+    )
     status = juju.wait(
         lambda status: jubilant.all_active(status) and jubilant.all_agents_idle(status), delay=5
     )
@@ -229,11 +227,11 @@ def test_integrate_new_relations_with_resource_dispatcher(
         30
     )  # sync can take up to 10 seconds for reconciliation loop to trigger (+ time to create namespace)
     for name in TESTER_ROLE_NAMES:
-        role = lightkube_client.get(Role, name, namespace=namespace)
-        assert role != None
+        assert_resource_status(lightkube_client, Role, name, namespace)
     for name in TESTER_ROLEBINDING_NAMES:
-        rb = lightkube_client.get(RoleBinding, name, namespace=namespace)
-        assert rb != None
+        assert_resource_status(lightkube_client, RoleBinding, name, namespace)
+    for name in TESTER_CONFIGMAPS_NAMES:
+        assert_resource_status(lightkube_client, ConfigMap, name, namespace)
 
 
 def test_change_in_manifest_reflected_again(
@@ -246,30 +244,19 @@ def test_change_in_manifest_reflected_again(
     juju.wait(
         lambda status: jubilant.all_active(status) and jubilant.all_agents_idle(status), delay=10
     )
-    time.sleep(
-        30
-    )  # sync can take up to 10 seconds for reconciliation loop to trigger (+ time to create namespace)
-
-    with pytest.raises(ApiError) as e_info:
-        lightkube_client.get(ServiceAccount, SERVICE_ACCOUNT_NAME, namespace=namespace)
-    assert "not found" in str(e_info)
-    service_account = lightkube_client.get(
-        ServiceAccount, SERVICE_ACCOUNT_NAME_2, namespace=namespace
+    assert_resource_status(
+        lightkube_client, ServiceAccount, SERVICE_ACCOUNT_NAME, namespace, exists=False
     )
-    assert service_account != None
+    assert_resource_status(lightkube_client, ServiceAccount, SERVICE_ACCOUNT_NAME_2, namespace)
 
 
 def test_profile_scoped_secrets(
-    juju: jubilant.Juju, lightkube_client: lightkube.Client, profile_namespaces: tuple[str, str]
+    lightkube_client: lightkube.Client, profile_namespaces: tuple[str, str]
 ):
     """Test that profile scoped secret (mlpipeline-minio-artifact) created previously by resource-dispatcher are removed."""
     primary_profile, secondary_profile = profile_namespaces
-    time.sleep(
-        30
-    )  # sync can take up to 10 seconds for reconciliation loop to trigger (+ time to create namespace)
     for name in TESTER_SECRET_NAMES_NEW:
-        secret = lightkube_client.get(Secret, name, namespace=primary_profile)
-        assert secret != None
-    with pytest.raises(ApiError) as e_info:
-        lightkube_client.get(Secret, PROFILE_SCOPED_SECRET, namespace=secondary_profile)
-    assert "not found" in str(e_info)
+        assert_resource_status(lightkube_client, Secret, name, primary_profile)
+    assert_resource_status(
+        lightkube_client, Secret, PROFILE_SCOPED_SECRET, secondary_profile, exists=False
+    )

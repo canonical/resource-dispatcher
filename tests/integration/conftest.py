@@ -3,9 +3,10 @@
 
 # See LICENSE file for licensing details.
 
+import contextlib
 import logging
 import shutil
-import subprocess
+import sys
 from pathlib import Path
 
 import jubilant
@@ -13,7 +14,6 @@ import lightkube
 import pytest
 import yaml
 from lightkube import codecs
-from lightkube.resources.core_v1 import Namespace
 
 from .helpers import delete_all_from_yaml, get_or_build_charm, safe_load_file_to_text
 
@@ -45,6 +45,7 @@ def pytest_addoption(parser):
         default=[],
         help="Path to a pre-built charm file (can be repeated)",
     )
+    parser.addoption("--model", default=None, help="Juju model to use for tests")
 
 
 def _find_charm_path(charm_paths: list[str], keyword: str, exclude: str = "") -> Path | None:
@@ -143,17 +144,20 @@ def profile_namespaces(namespace: str, secondary_namespace: str) -> tuple[str, s
 @pytest.fixture(scope="module")
 def juju(request: pytest.FixtureRequest):
     keep_models = bool(request.config.getoption("--keep-models"))
+    juju_model = request.config.getoption("--model")
 
-    with jubilant.temp_model(keep=keep_models) as juju:
+    if juju_model:
+        model_context = contextlib.nullcontext(jubilant.Juju(model=juju_model))
+    else:
+        model_context = jubilant.temp_model(keep=keep_models)
+
+    with model_context as juju:
         juju.wait_timeout = 10 * 60
 
         yield juju  # run the test
 
         if request.session.testsfailed:
-            log = juju.debug_log(limit=30)
-            print(log, end="")
-
-        status = juju.cli("status")
-        debug_log = juju.debug_log(limit=1000)
-        logger.info(debug_log)
-        logger.info(status)
+            debug_log = juju.debug_log(limit=1000)
+            status = juju.cli("status")
+            print(debug_log, end="", file=sys.stderr)
+            print(status, end="", file=sys.stderr)

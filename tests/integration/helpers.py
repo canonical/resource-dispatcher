@@ -7,9 +7,10 @@ from pathlib import Path
 
 import lightkube
 from charmed_kubeflow_chisme.kubernetes import KubernetesResourceHandler
-from charmed_kubeflow_chisme.testing import CharmSpec
 from lightkube import codecs
-from lightkube.generic_resource import load_in_cluster_generic_resources
+from lightkube.core.exceptions import ApiError
+from lightkube.generic_resource import GenericNamespacedResource, load_in_cluster_generic_resources
+from tenacity import retry, retry_if_exception_type, stop_after_delay, wait_exponential
 
 logger = logging.getLogger(__name__)
 
@@ -64,3 +65,45 @@ def get_or_build_charm(charm_path: Path, name: str) -> Path:
         raise FileNotFoundError(f"Could neither find, nor build the {name} charm.")
 
     return path
+
+
+@retry(
+    retry=retry_if_exception_type(AssertionError),
+    wait=wait_exponential(max=10),
+    stop=stop_after_delay(60),
+    reraise=True,
+)
+def assert_resource_status(
+    lightkube_client: lightkube.Client,
+    resource_type: GenericNamespacedResource,
+    name: str,
+    namespace: str,
+    exists: bool = True,
+):
+    """Assert whether a Kubernetes resource exists, raising a clear error otherwise.
+
+    When ``exists`` is ``True`` (the default), assert the resource is present and
+    return the fetched object for further assertions. When ``exists`` is ``False``,
+    assert the resource is absent. lightkube's ``get`` raises an ``ApiError`` with a
+    404 status when the resource is missing, which this helper translates into an
+    explicit ``AssertionError`` with a useful message depending on the expectation.
+    The check is retried with exponential backoff (capped at 10s per wait) for up to
+    60s to allow for the reconciliation loop to converge.
+    """
+    try:
+        obj = lightkube_client.get(resource_type, name, namespace=namespace)
+    except ApiError as e:
+        if e.status.code == 404:
+            if exists:
+                raise AssertionError(
+                    f"Expected {resource_type.__name__} '{name}' to exist in namespace "
+                    f"'{namespace}'"
+                ) from e
+            return
+        raise
+    if not exists:
+        raise AssertionError(
+            f"Expected {resource_type.__name__} '{name}' to be absent from namespace "
+            f"'{namespace}'"
+        )
+    return obj

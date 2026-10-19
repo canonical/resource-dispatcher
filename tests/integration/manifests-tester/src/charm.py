@@ -14,12 +14,13 @@ from charms.resource_dispatcher.v0.kubernetes_manifests import (
     KubernetesManifest,
     KubernetesManifestRequirerWrapper,
 )
-from ops import main
+from ops import EventBase, main
 from ops.charm import CharmBase
 from ops.model import ActiveStatus
 
 logger = logging.getLogger(__name__)
 
+CONFIGMAPS_RELATION_NAME = "config-maps"
 PODDEFAULTS_RELATION_NAME = "pod-defaults"
 SECRETS_RELATION_NAME = "secrets"
 SERVICEACCOUNTS_RELATION_NAME = "service-accounts"
@@ -49,6 +50,10 @@ class ManifestsTesterCharm(CharmBase):
         self.framework.observe(self.on.upgrade_charm, self._update_manifests_in_relation)
         self.framework.observe(self.on.config_changed, self._update_manifests_in_relation)
         self.framework.observe(self.on.leader_elected, self._update_manifests_in_relation)
+        self.framework.observe(
+            self.on[CONFIGMAPS_RELATION_NAME].relation_created,
+            self._update_manifests_in_relation,
+        )
         self.framework.observe(
             self.on[SERVICEACCOUNTS_RELATION_NAME].relation_created,
             self._update_manifests_in_relation,
@@ -90,6 +95,9 @@ class ManifestsTesterCharm(CharmBase):
             self._update_manifests_in_relation,
         )
 
+        self.configmaps_requirer_wrapper = KubernetesManifestRequirerWrapper(
+            charm=self, relation_name=CONFIGMAPS_RELATION_NAME
+        )
         self.service_accounts_requirer_wrapper = KubernetesManifestRequirerWrapper(
             charm=self, relation_name=SERVICEACCOUNTS_RELATION_NAME
         )
@@ -105,6 +113,10 @@ class ManifestsTesterCharm(CharmBase):
         self.rolebindings_requirer_wrapper = KubernetesManifestRequirerWrapper(
             charm=self, relation_name=ROLEBINDINGS_RELATION_NAME
         )
+
+    @property
+    def _configmaps_manifests(self):
+        return self._get_manifests(CONFIGMAPS_RELATION_NAME, self._manifests_folder)
 
     @property
     def _poddefaults_manifests(self):
@@ -132,15 +144,16 @@ class ManifestsTesterCharm(CharmBase):
 
     def _on_start(self, event):
         """Set active on start."""
-        self._update_manifests_in_relation(event=event)
+        self._update_manifests_in_relation(event)
         self.model.unit.status = ActiveStatus()
 
-    def _update_manifests_in_relation(self, event):
+    def _update_manifests_in_relation(self, _: EventBase):
         service_account_name = self.model.config["service_account_name"]
         serviceaccount_manifest = [
             KubernetesManifest(SERVICE_ACCOUNT_YAML.format(name=service_account_name))
         ]
 
+        self.configmaps_requirer_wrapper.send_data(self._configmaps_manifests)
         self.service_accounts_requirer_wrapper.send_data(serviceaccount_manifest)
         self.secrets_requirer_wrapper.send_data(self._secrets_manifests)
         self.poddefaults_requirer_wrapper.send_data(self._poddefaults_manifests)
